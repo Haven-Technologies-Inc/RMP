@@ -92,6 +92,7 @@ export const config = {
   // JWT
   jwt: {
     secret: getEnv('JWT_SECRET'),
+    refreshTokenSecret: getEnv('JWT_REFRESH_SECRET', getEnv('JWT_SECRET')),
     accessTokenExpiry: '1h',
     refreshTokenExpiry: '7d',
     algorithm: 'HS256' as const,
