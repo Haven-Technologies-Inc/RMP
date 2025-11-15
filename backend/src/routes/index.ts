@@ -13,6 +13,8 @@ import creditScoreRoutes from './credit-score.routes';
 import riskRoutes from './risk.routes';
 import webhookRoutes from './webhook.routes';
 import adminRoutes from './admin.routes';
+import analyticsRoutes from './analytics.routes';
+import streamRoutes from './stream.routes';
 
 const router = Router();
 
@@ -67,6 +69,8 @@ v1Router.use('/credit-score', creditScoreRoutes);
 v1Router.use('/risk', riskRoutes);
 v1Router.use('/webhooks', webhookRoutes);
 v1Router.use('/admin', adminRoutes);
+v1Router.use('/analytics', analyticsRoutes);
+v1Router.use('/stream', streamRoutes);
 
 // Mount v1 routes
 router.use('/v1', v1Router);
@@ -93,6 +97,8 @@ router.get('/', (req, res) => {
       creditScore: '/api/v1/credit-score',
       risk: '/api/v1/risk',
       webhooks: '/api/v1/webhooks',
+      analytics: '/api/v1/analytics',
+      stream: '/api/v1/stream',
     },
   });
 });

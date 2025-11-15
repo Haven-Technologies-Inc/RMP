@@ -233,6 +233,100 @@ export class StreamController {
   }
 
   /**
+   * Stream real-time analytics updates
+   * GET /api/v1/stream/analytics
+   */
+  async streamAnalytics(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = req.user!.userId;
+      const userRole = req.user!.role;
+      const { period = '7d' } = req.query;
+
+      // Only admins can stream analytics
+      if (userRole !== 'admin') {
+        res.status(403).json({
+          success: false,
+          error: {
+            code: 'FORBIDDEN',
+            message: 'Admin access required for analytics streaming',
+          },
+        });
+        return;
+      }
+
+      // Set SSE headers
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      res.setHeader('X-Accel-Buffering', 'no');
+
+      // Send initial connection message
+      res.write(`data: ${JSON.stringify({
+        type: 'connected',
+        timestamp: new Date().toISOString(),
+        period
+      })}\n\n`);
+
+      logger.info('Analytics stream started', { userId, period });
+
+      // Send analytics updates every 5 seconds
+      const updateInterval = setInterval(async () => {
+        try {
+          // Get real-time platform metrics
+          const db = require('../config/database').db;
+
+          // Quick stats query
+          const [metrics] = await db.raw(`
+            SELECT
+              COUNT(DISTINCT t.user_id) as active_users,
+              COUNT(t.transaction_id) as transaction_count,
+              SUM(t.amount) as total_volume,
+              AVG(CASE WHEN t.status = 'completed' THEN 1 ELSE 0 END) * 100 as success_rate
+            FROM transactions t
+            WHERE t.created_at >= NOW() - INTERVAL 5 MINUTE
+          `);
+
+          const analyticsUpdate = {
+            timestamp: new Date().toISOString(),
+            activeUsers: metrics.active_users || 0,
+            recentTransactions: metrics.transaction_count || 0,
+            volume: (metrics.total_volume || 0) / 100,
+            successRate: parseFloat((metrics.success_rate || 0).toFixed(1)),
+          };
+
+          res.write(`event: analytics_update\n`);
+          res.write(`data: ${JSON.stringify(analyticsUpdate)}\n\n`);
+
+        } catch (error: any) {
+          logger.error('Error sending analytics update', { error: error.message });
+        }
+      }, 5000);
+
+      // Send heartbeat every 30 seconds
+      const heartbeatInterval = setInterval(() => {
+        res.write(`: heartbeat\n\n`);
+      }, 30000);
+
+      // Handle client disconnect
+      req.on('close', () => {
+        clearInterval(updateInterval);
+        clearInterval(heartbeatInterval);
+        logger.info('Analytics stream closed', { userId });
+      });
+
+    } catch (error: any) {
+      logger.error('Error in analytics stream', { error: error.message });
+      res.status(500).json({
+        success: false,
+        error: {
+          code: 'STREAM_ERROR',
+          message: 'Failed to initialize analytics stream',
+        },
+      });
+    }
+  }
+
+  /**
    * Get active stream statistics
    * GET /api/v1/stream/stats
    */
