@@ -10,11 +10,13 @@ import {
 
 export enum VitalType {
   BLOOD_PRESSURE = 'blood_pressure',
+  BLOOD_GLUCOSE = 'blood_glucose',
   GLUCOSE = 'glucose',
   SPO2 = 'spo2',
   WEIGHT = 'weight',
   HEART_RATE = 'heart_rate',
   TEMPERATURE = 'temperature',
+  RESPIRATORY_RATE = 'respiratory_rate',
   ECG = 'ecg',
 }
 
@@ -25,8 +27,8 @@ export enum VitalStatus {
 }
 
 @Entity('vital_readings')
-@Index(['patientId', 'type', 'timestamp'])
-@Index(['patientId', 'timestamp'])
+@Index(['patientId', 'type', 'recordedAt'])
+@Index(['patientId', 'recordedAt'])
 export class VitalReading {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -38,6 +40,9 @@ export class VitalReading {
   @Column('uuid', { nullable: true })
   deviceId: string;
 
+  @Column('uuid', { nullable: true })
+  providerId: string;
+
   @Column({
     type: 'enum',
     enum: VitalType,
@@ -46,10 +51,15 @@ export class VitalReading {
 
   @Column('jsonb')
   values: Record<string, number>;
-  // For BP: { systolic: 120, diastolic: 80, heartRate: 72 }
-  // For Glucose: { glucose: 105 }
-  // For SpO2: { spo2: 98, heartRate: 70 }
-  // For Weight: { weight: 168 }
+
+  @Column({ type: 'float', nullable: true })
+  value: number;
+
+  @Column({ type: 'float', nullable: true })
+  systolic: number;
+
+  @Column({ type: 'float', nullable: true })
+  diastolic: number;
 
   @Column()
   unit: string;
@@ -63,7 +73,7 @@ export class VitalReading {
 
   @Column({ type: 'timestamp' })
   @Index()
-  timestamp: Date;
+  recordedAt: Date;
 
   @Column({ nullable: true })
   mealContext: string; // fasting, before_meal, after_meal, bedtime

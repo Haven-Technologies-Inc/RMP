@@ -8,6 +8,10 @@ import configuration from './config/configuration';
 // Database
 import { DatabaseModule } from './database/database.module';
 
+// Common Modules
+import { CryptoModule } from './common/crypto/crypto.module';
+import { HealthModule } from './health/health.module';
+
 // Feature Modules
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
@@ -18,6 +22,17 @@ import { BillingModule } from './billing/billing.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { AuditModule } from './audit/audit.module';
 import { AIModule } from './ai/ai.module';
+import { PatientsModule } from './patients/patients.module';
+import { OrganizationsModule } from './organizations/organizations.module';
+import { MessagingModule } from './messaging/messaging.module';
+import { AnalyticsModule } from './analytics/analytics.module';
+import { IntegrationsModule } from './integrations/integrations.module';
+import { ReportsModule } from './reports/reports.module';
+import { AdminModule } from './admin/admin.module';
+import { AppointmentsModule } from './appointments/appointments.module';
+import { MedicationsModule } from './medications/medications.module';
+import { WebRTCModule } from './webrtc/webrtc.module';
+import { WebSocketModule } from './websocket/websocket.module';
 
 @Module({
   imports: [
@@ -36,6 +51,10 @@ import { AIModule } from './ai/ai.module';
     // Database
     DatabaseModule,
 
+    // Common modules
+    CryptoModule,
+    HealthModule,
+
     // Feature modules
     AuthModule,
     UsersModule,
@@ -46,6 +65,17 @@ import { AIModule } from './ai/ai.module';
     NotificationsModule,
     AuditModule,
     AIModule,
+    PatientsModule,
+    OrganizationsModule,
+    MessagingModule,
+    AnalyticsModule,
+    IntegrationsModule,
+    ReportsModule,
+    AdminModule,
+    AppointmentsModule,
+    MedicationsModule,
+    WebRTCModule,
+    WebSocketModule,
   ],
   controllers: [AppController],
   providers: [AppService],

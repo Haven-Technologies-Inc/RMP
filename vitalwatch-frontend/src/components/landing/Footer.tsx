@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { Activity, Linkedin, Twitter, Youtube, Facebook } from "lucide-react";
+import Image from "next/image";
+import { Linkedin, Twitter, Youtube, Facebook } from "lucide-react";
 
 const footerLinks = {
   product: {
@@ -61,13 +62,15 @@ export function Footer() {
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-8">
           {/* Brand Column */}
           <div className="col-span-2">
-            <Link href="/" className="flex items-center gap-2 mb-4">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-emerald-500 rounded-xl flex items-center justify-center">
-                <Activity className="h-6 w-6 text-white" />
-              </div>
-              <span className="text-xl font-bold">
-                VitalWatch<span className="text-blue-400">AI</span>
-              </span>
+            <Link href="/" className="flex items-center mb-4">
+              <Image
+                src="/logo.png"
+                alt="VytalWatch AI"
+                width={140}
+                height={48}
+                className="h-12"
+                style={{ width: 'auto', height: 'auto' }}
+              />
             </Link>
             <p className="text-slate-400 text-sm mb-6 max-w-sm">
               AI-powered remote patient monitoring platform that reduces readmissions,
@@ -115,7 +118,7 @@ export function Footer() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="text-sm text-slate-400">
-              © {new Date().getFullYear()} VitalWatch AI. All rights reserved.
+              © {new Date().getFullYear()} VytalWatch AI. All rights reserved.
             </div>
             <div className="flex items-center gap-6">
               <div className="flex items-center gap-2">

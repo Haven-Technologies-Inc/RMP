@@ -3,12 +3,19 @@ import {
   Get,
   Post,
   Put,
+  Delete,
   Body,
   Param,
   Query,
   UseGuards,
   ParseUUIDPipe,
+  HttpCode,
+  HttpStatus,
+  Headers,
+  RawBodyRequest,
+  Req,
 } from '@nestjs/common';
+import { Request } from 'express';
 import { BillingService, CreateSubscriptionDto, CreateBillingRecordDto } from './billing.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -112,5 +119,117 @@ export class BillingController {
       page,
       limit,
     });
+  }
+
+  @Get('invoices/:id')
+  @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
+  async getInvoice(@Param('id', ParseUUIDPipe) id: string) {
+    return this.billingService.getInvoice(id);
+  }
+
+  // Customer Management
+  @Post('create-customer')
+  @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
+  async createCustomer(
+    @Body() dto: { email: string; name: string; organizationId?: string },
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.billingService.createStripeCustomer(dto, user);
+  }
+
+  @Get('customer/:id')
+  @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
+  async getCustomer(@Param('id') id: string) {
+    return this.billingService.getStripeCustomer(id);
+  }
+
+  @Get('customer')
+  @Roles(UserRole.ADMIN, UserRole.PROVIDER)
+  async getCurrentCustomer(@CurrentUser() user: CurrentUserPayload) {
+    return this.billingService.getCurrentCustomer(user);
+  }
+
+  // Checkout Session
+  @Post('create-checkout-session')
+  @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
+  async createCheckoutSession(
+    @Body() dto: { priceId: string; successUrl: string; cancelUrl: string },
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.billingService.createCheckoutSession(dto, user);
+  }
+
+  // Payment Methods
+  @Get('payment-methods')
+  @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
+  async getPaymentMethods(@CurrentUser() user: CurrentUserPayload) {
+    return this.billingService.getPaymentMethods(user);
+  }
+
+  @Post('payment-methods')
+  @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
+  async addPaymentMethod(
+    @Body() dto: { paymentMethodId: string },
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.billingService.addPaymentMethod(dto.paymentMethodId, user);
+  }
+
+  @Delete('payment-methods/:id')
+  @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deletePaymentMethod(
+    @Param('id') id: string,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    await this.billingService.deletePaymentMethod(id, user);
+  }
+
+  @Put('payment-methods/:id/default')
+  @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
+  async setDefaultPaymentMethod(
+    @Param('id') id: string,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.billingService.setDefaultPaymentMethod(id, user);
+  }
+
+  // Usage
+  @Get('usage')
+  @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
+  async getUsage(
+    @CurrentUser() user: CurrentUserPayload,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.billingService.getUsage(user, { startDate, endDate });
+  }
+
+  // Pricing Plans
+  @Get('plans')
+  async getPricingPlans() {
+    return this.billingService.getPricingPlans();
+  }
+
+  @Get('plans/:id')
+  async getPricingPlan(@Param('id') id: string) {
+    return this.billingService.getPricingPlan(id);
+  }
+
+  // Setup Intent (for adding payment methods)
+  @Post('setup-intent')
+  @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
+  async createSetupIntent(@CurrentUser() user: CurrentUserPayload) {
+    return this.billingService.createSetupIntent(user);
+  }
+
+  // Webhook (Stripe)
+  @Post('webhook')
+  @HttpCode(HttpStatus.OK)
+  async handleWebhook(
+    @Req() req: RawBodyRequest<Request>,
+    @Headers('stripe-signature') signature: string,
+  ) {
+    return this.billingService.handleStripeWebhook(req.rawBody, signature);
   }
 }

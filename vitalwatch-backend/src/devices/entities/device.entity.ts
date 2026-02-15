@@ -52,6 +52,9 @@ export class Device {
   @JoinColumn({ name: 'patientId' })
   patient: User;
 
+  @Column({ nullable: true })
+  organizationId: string;
+
   @Column({ type: 'enum', enum: DeviceType })
   type: DeviceType;
 

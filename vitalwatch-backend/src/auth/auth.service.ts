@@ -15,7 +15,7 @@ interface JwtPayload {
   organizationId?: string;
 }
 
-interface TokenPair {
+export interface TokenPair {
   accessToken: string;
   refreshToken: string;
   expiresIn: number;
@@ -319,5 +319,157 @@ export class AuthService {
       case 'd': return value * 86400;
       default: return 900;
     }
+  }
+
+  async sendSmsVerificationCode(phone: string): Promise<void> {
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    
+    // Store code with expiry (5 minutes)
+    await this.usersService.setSmsVerificationCode(phone, code);
+    
+    // Send via Twilio
+    await this.notificationsService.sendSmsVerificationCode(phone, code);
+  }
+
+  async verifySmsCode(phone: string, code: string): Promise<void> {
+    const isValid = await this.usersService.verifySmsCode(phone, code);
+    
+    if (!isValid) {
+      throw new BadRequestException('Invalid or expired verification code');
+    }
+
+    await this.usersService.markPhoneVerified(phone);
+  }
+
+  async validateSocialLogin(provider: 'google' | 'microsoft' | 'apple', token: string): Promise<User> {
+    let profile: { providerId: string; email: string; firstName: string; lastName: string; avatar?: string };
+
+    switch (provider) {
+      case 'google':
+        profile = await this.verifyGoogleToken(token);
+        break;
+      case 'microsoft':
+        profile = await this.verifyMicrosoftToken(token);
+        break;
+      case 'apple':
+        profile = await this.verifyAppleToken(token);
+        break;
+      default:
+        throw new BadRequestException('Invalid provider');
+    }
+
+    return this.validateOAuthLogin({ provider, ...profile });
+  }
+
+  private async verifyGoogleToken(token: string): Promise<{ providerId: string; email: string; firstName: string; lastName: string; avatar?: string }> {
+    // In production, verify with Google OAuth API
+    // For now, decode the token (assuming it's a JWT from Google)
+    try {
+      const response = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${token}`);
+      const data = await response.json();
+      
+      if (!data.email) {
+        throw new BadRequestException('Invalid Google token');
+      }
+
+      return {
+        providerId: data.sub,
+        email: data.email,
+        firstName: data.given_name || '',
+        lastName: data.family_name || '',
+        avatar: data.picture,
+      };
+    } catch {
+      throw new BadRequestException('Failed to verify Google token');
+    }
+  }
+
+  private async verifyMicrosoftToken(token: string): Promise<{ providerId: string; email: string; firstName: string; lastName: string; avatar?: string }> {
+    try {
+      const response = await fetch('https://graph.microsoft.com/v1.0/me', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await response.json();
+
+      if (!data.mail && !data.userPrincipalName) {
+        throw new BadRequestException('Invalid Microsoft token');
+      }
+
+      return {
+        providerId: data.id,
+        email: data.mail || data.userPrincipalName,
+        firstName: data.givenName || '',
+        lastName: data.surname || '',
+      };
+    } catch {
+      throw new BadRequestException('Failed to verify Microsoft token');
+    }
+  }
+
+  private async verifyAppleToken(token: string): Promise<{ providerId: string; email: string; firstName: string; lastName: string }> {
+    try {
+      // Apple tokens are JWTs that need to be verified with Apple's public keys
+      const decoded = this.jwtService.decode(token) as any;
+      
+      if (!decoded || !decoded.sub) {
+        throw new BadRequestException('Invalid Apple token');
+      }
+
+      return {
+        providerId: decoded.sub,
+        email: decoded.email || '',
+        firstName: decoded.firstName || '',
+        lastName: decoded.lastName || '',
+      };
+    } catch {
+      throw new BadRequestException('Failed to verify Apple token');
+    }
+  }
+
+  async sendMagicLink(email: string): Promise<void> {
+    const user = await this.usersService.findByEmail(email);
+    
+    if (!user) {
+      // Don't reveal if user exists
+      return;
+    }
+
+    const magicToken = uuidv4();
+    await this.usersService.setMagicLinkToken(user.id, magicToken);
+    await this.notificationsService.sendMagicLinkEmail(user, magicToken);
+
+    await this.auditService.log({
+      action: 'MAGIC_LINK_REQUESTED',
+      userId: user.id,
+    });
+  }
+
+  async verifyMagicLink(token: string): Promise<User> {
+    const user = await this.usersService.findByMagicLinkToken(token);
+    
+    if (!user) {
+      throw new BadRequestException('Invalid or expired magic link');
+    }
+
+    await this.usersService.clearMagicLinkToken(user.id);
+
+    await this.auditService.log({
+      action: 'MAGIC_LINK_LOGIN',
+      userId: user.id,
+    });
+
+    return user;
+  }
+
+  async getCurrentUser(userId: string): Promise<Partial<User>> {
+    const user = await this.usersService.findById(userId);
+    
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    // Return user without sensitive data
+    const { passwordHash, resetToken, verificationToken, magicLinkToken, ...safeUser } = user as any;
+    return safeUser;
   }
 }

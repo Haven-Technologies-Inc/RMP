@@ -4,9 +4,13 @@ import { PassportModule } from '@nestjs/passport';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
+import { EmergencyAccessController } from './controllers/emergency-access.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
+import { SessionTimeoutGuard } from './guards/session-timeout.guard';
+import { EmergencyAccessService } from './services/emergency-access.service';
+import { PasswordValidator } from './validators/password.validator';
 import { UsersModule } from '../users/users.module';
 import { AuditModule } from '../audit/audit.module';
 import { NotificationsModule } from '../notifications/notifications.module';
@@ -29,8 +33,23 @@ import { NotificationsModule } from '../notifications/notifications.module';
     AuditModule,
     NotificationsModule,
   ],
-  controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, JwtAuthGuard, RolesGuard],
-  exports: [AuthService, JwtAuthGuard, RolesGuard],
+  controllers: [AuthController, EmergencyAccessController],
+  providers: [
+    AuthService,
+    JwtStrategy,
+    JwtAuthGuard,
+    RolesGuard,
+    SessionTimeoutGuard,
+    EmergencyAccessService,
+    PasswordValidator,
+  ],
+  exports: [
+    AuthService,
+    JwtAuthGuard,
+    RolesGuard,
+    SessionTimeoutGuard,
+    EmergencyAccessService,
+    PasswordValidator,
+  ],
 })
 export class AuthModule {}

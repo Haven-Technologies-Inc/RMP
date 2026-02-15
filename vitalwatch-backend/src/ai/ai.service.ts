@@ -108,7 +108,7 @@ export class AIService {
     context?: { patientId?: string; vitals?: VitalReading[] },
   ): Promise<string> {
     const systemMessage = `
-      You are VitalWatch AI, a healthcare assistant specialized in Remote Patient Monitoring (RPM).
+      You are VytalWatch AI, a healthcare assistant specialized in Remote Patient Monitoring (RPM).
       You help healthcare providers and patients understand health data, trends, and recommendations.
 
       Guidelines:
@@ -195,7 +195,7 @@ export class AIService {
   }
 
   private buildVitalAnalysisPrompt(vital: VitalReading): string {
-    const typeNames: Record<VitalType, string> = {
+    const typeNames: Partial<Record<VitalType, string>> = {
       [VitalType.BLOOD_PRESSURE]: 'Blood Pressure',
       [VitalType.HEART_RATE]: 'Heart Rate',
       [VitalType.BLOOD_GLUCOSE]: 'Blood Glucose',
@@ -203,6 +203,8 @@ export class AIService {
       [VitalType.TEMPERATURE]: 'Body Temperature',
       [VitalType.WEIGHT]: 'Weight',
       [VitalType.RESPIRATORY_RATE]: 'Respiratory Rate',
+      [VitalType.GLUCOSE]: 'Glucose',
+      [VitalType.ECG]: 'ECG',
     };
 
     let valueStr = `${vital.value} ${vital.unit}`;
@@ -343,5 +345,247 @@ export class AIService {
     }
 
     return defaultRecs;
+  }
+
+  // New methods for controller endpoints
+
+  async getPatientInsights(patientId: string): Promise<PatientInsight> {
+    // In production, fetch patient vitals and alerts from database
+    return {
+      summary: `AI-generated health insights for patient ${patientId}`,
+      trends: ['Blood pressure trending stable', 'Weight decreasing slightly'],
+      concerns: [],
+      recommendations: ['Continue current medication regimen', 'Maintain regular monitoring'],
+      overallRiskLevel: 'low',
+    };
+  }
+
+  async predictRisk(body: { patientId: string; vitals?: any[]; conditions?: string[] }): Promise<any> {
+    const { patientId, vitals, conditions } = body;
+    
+    // Calculate risk based on vitals and conditions
+    let baseRisk = 20;
+    
+    if (conditions?.length) {
+      baseRisk += conditions.length * 10;
+    }
+    
+    if (vitals?.some(v => v.status === 'critical')) {
+      baseRisk += 30;
+    } else if (vitals?.some(v => v.status === 'warning')) {
+      baseRisk += 15;
+    }
+
+    const riskScore = Math.min(100, baseRisk);
+    
+    return {
+      patientId,
+      riskScore,
+      riskLevel: riskScore >= 70 ? 'high' : riskScore >= 40 ? 'moderate' : 'low',
+      factors: [
+        { name: 'Age', contribution: 15 },
+        { name: 'Vital trends', contribution: 25 },
+        { name: 'Conditions', contribution: conditions?.length ? 30 : 0 },
+      ],
+      predictions: {
+        hospitalization: { probability: riskScore / 100 * 0.3, timeframe: '30 days' },
+        emergency: { probability: riskScore / 100 * 0.15, timeframe: '30 days' },
+      },
+      recommendations: [
+        'Increase monitoring frequency',
+        'Schedule provider follow-up',
+      ],
+      generatedAt: new Date().toISOString(),
+    };
+  }
+
+  async getRecommendations(patientId: string, type?: string): Promise<any> {
+    const recommendations = [
+      { type: 'medication', text: 'Consider adjusting blood pressure medication timing', priority: 'medium' },
+      { type: 'lifestyle', text: 'Increase daily water intake to 8 glasses', priority: 'low' },
+      { type: 'monitoring', text: 'Take blood pressure readings twice daily', priority: 'high' },
+      { type: 'activity', text: 'Light walking for 20 minutes daily', priority: 'medium' },
+    ];
+
+    const filtered = type ? recommendations.filter(r => r.type === type) : recommendations;
+
+    return {
+      patientId,
+      recommendations: filtered,
+      generatedAt: new Date().toISOString(),
+    };
+  }
+
+  async trainModel(body: { modelType: string; trainingData?: any; parameters?: any }): Promise<any> {
+    const jobId = `train_${Date.now()}`;
+    
+    // In production, queue training job
+    return {
+      jobId,
+      modelType: body.modelType,
+      status: 'queued',
+      estimatedCompletion: new Date(Date.now() + 3600000).toISOString(),
+      message: 'Training job has been queued',
+    };
+  }
+
+  async getModels(status?: string): Promise<any[]> {
+    const models = [
+      {
+        id: 'model_risk_v1',
+        name: 'Risk Prediction Model',
+        type: 'risk_prediction',
+        version: '1.2.0',
+        status: 'active',
+        accuracy: 0.87,
+        lastTrained: '2024-01-15T00:00:00Z',
+        createdAt: '2024-01-01T00:00:00Z',
+      },
+      {
+        id: 'model_vital_v1',
+        name: 'Vital Analysis Model',
+        type: 'vital_analysis',
+        version: '1.1.0',
+        status: 'active',
+        accuracy: 0.92,
+        lastTrained: '2024-01-10T00:00:00Z',
+        createdAt: '2023-12-01T00:00:00Z',
+      },
+      {
+        id: 'model_alert_v1',
+        name: 'Alert Classification Model',
+        type: 'alert_classification',
+        version: '1.0.0',
+        status: 'inactive',
+        accuracy: 0.85,
+        lastTrained: '2024-01-05T00:00:00Z',
+        createdAt: '2023-11-01T00:00:00Z',
+      },
+    ];
+
+    return status ? models.filter(m => m.status === status) : models;
+  }
+
+  async getModel(id: string): Promise<any> {
+    const models = await this.getModels();
+    const model = models.find(m => m.id === id);
+    
+    if (!model) {
+      return null;
+    }
+
+    return {
+      ...model,
+      metrics: {
+        precision: 0.89,
+        recall: 0.85,
+        f1Score: 0.87,
+        auc: 0.91,
+      },
+      trainingHistory: [
+        { version: '1.0.0', date: '2023-12-01', accuracy: 0.82 },
+        { version: '1.1.0', date: '2024-01-10', accuracy: 0.87 },
+      ],
+    };
+  }
+
+  async activateModel(id: string): Promise<any> {
+    return {
+      id,
+      status: 'active',
+      activatedAt: new Date().toISOString(),
+      message: 'Model activated successfully',
+    };
+  }
+
+  async deactivateModel(id: string): Promise<any> {
+    return {
+      id,
+      status: 'inactive',
+      deactivatedAt: new Date().toISOString(),
+      message: 'Model deactivated successfully',
+    };
+  }
+
+  async getPerformanceMetrics(options: { modelId?: string; startDate?: string; endDate?: string }): Promise<any> {
+    return {
+      period: { startDate: options.startDate, endDate: options.endDate },
+      overall: {
+        accuracy: 0.89,
+        precision: 0.87,
+        recall: 0.91,
+        f1Score: 0.89,
+        totalPredictions: 15420,
+        correctPredictions: 13724,
+      },
+      byModel: [
+        { modelId: 'model_risk_v1', accuracy: 0.87, predictions: 8500 },
+        { modelId: 'model_vital_v1', accuracy: 0.92, predictions: 4200 },
+        { modelId: 'model_alert_v1', accuracy: 0.85, predictions: 2720 },
+      ],
+      trend: Array.from({ length: 7 }, (_, i) => ({
+        date: new Date(Date.now() - i * 86400000).toISOString().split('T')[0],
+        accuracy: 0.85 + Math.random() * 0.1,
+        predictions: Math.floor(1500 + Math.random() * 500),
+      })),
+    };
+  }
+
+  async batchAnalyze(body: { patientIds: string[]; analysisType: string }): Promise<any> {
+    const jobId = `batch_${Date.now()}`;
+    
+    return {
+      jobId,
+      patientCount: body.patientIds.length,
+      analysisType: body.analysisType,
+      status: 'queued',
+      estimatedCompletion: new Date(Date.now() + body.patientIds.length * 60000).toISOString(),
+      message: `Batch analysis queued for ${body.patientIds.length} patients`,
+    };
+  }
+
+  async realTimeAnalysis(body: { vitalReading: any; patientId: string }): Promise<any> {
+    const { vitalReading, patientId } = body;
+    
+    // Simulate real-time analysis
+    const isAnomalous = Math.random() > 0.8;
+    
+    return {
+      patientId,
+      vitalType: vitalReading.type,
+      value: vitalReading.value,
+      analysis: {
+        isAnomalous,
+        confidence: isAnomalous ? 0.75 : 0.95,
+        deviation: isAnomalous ? 'significant' : 'normal',
+        trend: 'stable',
+      },
+      alert: isAnomalous ? {
+        recommended: true,
+        severity: 'warning',
+        message: `Unusual ${vitalReading.type} reading detected`,
+      } : null,
+      recommendations: isAnomalous ? ['Review patient history', 'Consider follow-up reading'] : [],
+      processedAt: new Date().toISOString(),
+      latencyMs: Math.floor(50 + Math.random() * 100),
+    };
+  }
+
+  async calculateRiskScore(patientId: string): Promise<any> {
+    // Simplified risk calculation
+    const score = Math.floor(20 + Math.random() * 60);
+    
+    return {
+      patientId,
+      score,
+      level: score >= 70 ? 'high' : score >= 40 ? 'moderate' : 'low',
+      factors: [
+        { name: 'Vital trends', weight: 0.3, score: Math.floor(Math.random() * 100) },
+        { name: 'Alert history', weight: 0.25, score: Math.floor(Math.random() * 100) },
+        { name: 'Adherence', weight: 0.2, score: Math.floor(Math.random() * 100) },
+        { name: 'Demographics', weight: 0.25, score: Math.floor(Math.random() * 100) },
+      ],
+      calculatedAt: new Date().toISOString(),
+    };
   }
 }

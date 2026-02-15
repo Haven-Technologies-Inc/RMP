@@ -1,0 +1,781 @@
+// VytalWatch Prisma Schema
+// PostgreSQL database schema for patient records
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  patient
+  provider
+  admin
+  superadmin
+}
+
+enum UserStatus {
+  active
+  inactive
+  suspended
+  pending
+}
+
+enum AlertSeverity {
+  info
+  warning
+  critical
+}
+
+enum AlertStatus {
+  active
+  acknowledged
+  resolved
+  dismissed
+}
+
+enum DeviceType {
+  blood_pressure_monitor
+  pulse_oximeter
+  glucose_meter
+  weight_scale
+  ecg_monitor
+  thermometer
+}
+
+enum DeviceStatus {
+  active
+  inactive
+  low_battery
+  offline
+}
+
+enum SubscriptionPlan {
+  starter
+  professional
+  enterprise
+}
+
+enum SubscriptionStatus {
+  active
+  past_due
+  canceled
+  trialing
+}
+
+enum BillingStatus {
+  pending
+  submitted
+  paid
+  rejected
+}
+
+// ==================== TENOVI ENUMS ====================
+
+enum TenoviWhitelistStatus {
+  RE // REGISTERED
+  CO // CONFIRMED
+  PE // PENDING
+  RM // REMOVED
+}
+
+enum TenoviDeviceStatus {
+  active
+  inactive
+  connected
+  disconnected
+  unlinked
+}
+
+enum TenoviShippingStatus {
+  DR // DRAFT
+  RQ // REQUESTED
+  PE // PENDING
+  CR // CREATED
+  OH // ON_HOLD
+  RS // READY_TO_SHIP
+  SH // SHIPPED
+  DE // DELIVERED
+  RE // RETURNED
+  CA // CANCELLED
+}
+
+// ==================== INVOICE ENUMS ====================
+
+enum InvoiceStatus {
+  draft
+  open
+  paid
+  void
+  uncollectible
+  failed
+}
+
+// ==================== REPORT ENUMS ====================
+
+enum ReportType {
+  patient_summary
+  vitals_history
+  billing
+  compliance
+  population_health
+  custom
+}
+
+enum ReportStatus {
+  pending
+  generating
+  completed
+  failed
+}
+
+// ==================== APPOINTMENT ENUMS ====================
+
+enum AppointmentType {
+  in_person
+  telehealth
+  phone
+}
+
+enum AppointmentStatus {
+  scheduled
+  confirmed
+  in_progress
+  completed
+  cancelled
+  no_show
+}
+
+// ==================== CORE MODELS ====================
+
+model User {
+  id                String     @id @default(uuid())
+  email             String     @unique
+  passwordHash      String?
+  firstName         String
+  lastName          String
+  phone             String?
+  avatar            String?
+  role              UserRole   @default(patient)
+  status            UserStatus @default(pending)
+  emailVerified     Boolean    @default(false)
+  phoneVerified     Boolean    @default(false)
+  mfaEnabled        Boolean    @default(false)
+  mfaSecret         String?
+  organizationId    String?
+  organization      Organization? @relation(fields: [organizationId], references: [id])
+
+  // OAuth
+  googleId          String?    @unique
+  microsoftId       String?    @unique
+  appleId           String?    @unique
+
+  // Session
+  lastLoginAt       DateTime?
+  lastLoginIp       String?
+  passwordChangedAt DateTime?
+
+  // Tokens
+  verificationToken      String?
+  resetToken             String?
+  resetTokenExpiresAt    DateTime?
+
+  // Notification Preferences
+  notificationPreferences Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  patientProfile    PatientProfile?
+  providerProfile   ProviderProfile?
+  notifications     Notification[]
+  auditLogs         AuditLog[]       @relation("AuditUser")
+  auditLogsActioned AuditLog[]       @relation("AuditActionBy")
+
+  // New relations
+  tenoviDevices             TenoviHwiDevice[]          @relation("TenoviDevicePatient")
+  invoices                  Invoice[]
+  reports                   Report[]
+  apiKeys                   ApiKey[]
+  createdThreads            MessageThread[]            @relation("ThreadCreator")
+  threadParticipations      MessageThreadParticipant[]
+  sentMessages              Message[]
+  appointmentsAsPatient     Appointment[]              @relation("AppointmentPatient")
+  appointmentsAsProvider    Appointment[]              @relation("AppointmentProvider")
+
+  @@index([email])
+  @@index([organizationId])
+  @@map("users")
+}
+
+model PatientProfile {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dateOfBirth     DateTime?
+  gender          String?
+  conditions      String[]
+  allergies       String[]
+  bloodType       String?
+
+  // Emergency Contact
+  emergencyContactName     String?
+  emergencyContactPhone    String?
+  emergencyContactRelation String?
+
+  // Insurance
+  insuranceProvider    String?
+  insurancePolicyNumber String?
+  insuranceGroupNumber  String?
+
+  // Care Team
+  primaryProviderId String?
+  primaryProvider   ProviderProfile? @relation("PrimaryProvider", fields: [primaryProviderId], references: [id])
+  careTeamIds       String[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  devices           Device[]
+  medications       Medication[]
+  alerts            Alert[]
+  aiInsights        AIInsight[]
+  billingRecords    BillingRecord[]
+
+  @@index([userId])
+  @@index([primaryProviderId])
+  @@map("patient_profiles")
+}
+
+model ProviderProfile {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  npi             String?  @unique
+  specialty       String?
+  credentials     String[]
+  licenseStates   String[]
+  bio             String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  primaryPatients PatientProfile[] @relation("PrimaryProvider")
+  alerts          Alert[]          @relation("AlertProvider")
+
+  @@index([userId])
+  @@index([npi])
+  @@map("provider_profiles")
+}
+
+model Organization {
+  id          String   @id @default(uuid())
+  name        String
+  type        String   // clinic, hospital, practice, agency
+  address     Json?
+  phone       String?
+  email       String?
+  taxId       String?
+  npi         String?
+  logoUrl     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  users           User[]
+  subscription    Subscription?
+  devices         Device[]
+  tenoviGateways  TenoviGateway[]
+  tenoviHwiDevices TenoviHwiDevice[] @relation("TenoviDeviceOrganization")
+
+  @@map("organizations")
+}
+
+model Subscription {
+  id                   String             @id @default(uuid())
+  organizationId       String             @unique
+  organization         Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  plan                 SubscriptionPlan   @default(starter)
+  status               SubscriptionStatus @default(trialing)
+  currentPeriodStart   DateTime
+  currentPeriodEnd     DateTime
+  trialEnd             DateTime?
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("subscriptions")
+}
+
+// ==================== DEVICE MODELS ====================
+
+model Device {
+  id            String       @id @default(uuid())
+  serialNumber  String       @unique
+  type          DeviceType
+  model         String
+  manufacturer  String
+  status        DeviceStatus @default(inactive)
+  batteryLevel  Int?
+  firmware      String?
+  lastReadingAt DateTime?
+
+  // Assignment
+  patientId      String?
+  patient        PatientProfile? @relation(fields: [patientId], references: [id])
+  assignedAt     DateTime?
+  organizationId String?
+  organization   Organization?   @relation(fields: [organizationId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([patientId])
+  @@index([serialNumber])
+  @@index([organizationId])
+  @@map("devices")
+}
+
+// ==================== ALERT MODELS ====================
+
+model Alert {
+  id            String        @id @default(uuid())
+  patientId     String
+  patient       PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  providerId    String?
+  provider      ProviderProfile? @relation("AlertProvider", fields: [providerId], references: [id])
+  type          String
+  severity      AlertSeverity
+  status        AlertStatus   @default(active)
+  title         String
+  message       String
+  vitalReadingId String?      // Reference to InfluxDB reading
+
+  acknowledgedAt DateTime?
+  acknowledgedBy String?
+  resolvedAt     DateTime?
+  resolvedBy     String?
+  resolution     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([patientId])
+  @@index([providerId])
+  @@index([status])
+  @@index([severity])
+  @@map("alerts")
+}
+
+// ==================== AI MODELS ====================
+
+model AIInsight {
+  id             String        @id @default(uuid())
+  patientId      String
+  patient        PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  type           String        // trend, anomaly, prediction, recommendation, correlation
+  severity       AlertSeverity?
+  title          String
+  message        String
+  confidence     Float
+  evidence       String?
+  recommendation String?
+  vitalTypes     String[]
+  data           Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([patientId])
+  @@index([type])
+  @@map("ai_insights")
+}
+
+// ==================== MEDICATION MODELS ====================
+
+model Medication {
+  id           String         @id @default(uuid())
+  patientId    String
+  patient      PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  name         String
+  dosage       String
+  frequency    String
+  schedule     Json           // Array of { time, taken, takenAt }
+  prescribedBy String?
+  prescribedAt DateTime?
+  refillDate   DateTime?
+  notes        String?
+  active       Boolean        @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([patientId])
+  @@map("medications")
+}
+
+// ==================== BILLING MODELS ====================
+
+model BillingRecord {
+  id              String        @id @default(uuid())
+  patientId       String
+  patient         PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  providerId      String?
+  organizationId  String?
+  month           String        // YYYY-MM format
+  cptCodes        Json          // Array of CPT code objects
+  totalAmount     Float
+  status          BillingStatus @default(pending)
+  submittedAt     DateTime?
+  paidAt          DateTime?
+  rejectionReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([patientId])
+  @@index([month])
+  @@index([status])
+  @@map("billing_records")
+}
+
+// ==================== NOTIFICATION MODELS ====================
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String   // alert, message, reminder, system, billing
+  title     String
+  message   String
+  read      Boolean  @default(false)
+  actionUrl String?
+  data      Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([read])
+  @@map("notifications")
+}
+
+// ==================== AUDIT MODELS ====================
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  userId      String?
+  user        User?    @relation("AuditUser", fields: [userId], references: [id])
+  actionById  String?
+  actionBy    User?    @relation("AuditActionBy", fields: [actionById], references: [id])
+  action      String   // CREATE, READ, UPDATE, DELETE
+  resource    String   // users, patients, vitals, etc.
+  resourceId  String?
+  oldData     Json?
+  newData     Json?
+  ipAddress   String?
+  userAgent   String?
+  metadata    Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([resource])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ==================== SESSION MODELS ====================
+
+model Session {
+  id           String   @id @default(uuid())
+  userId       String
+  token        String   @unique
+  refreshToken String   @unique
+  ipAddress    String?
+  userAgent    String?
+  expiresAt    DateTime
+  lastActiveAt DateTime @default(now())
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([token])
+  @@map("sessions")
+}
+
+// ==================== TENOVI GATEWAY MODELS ====================
+
+model TenoviGateway {
+  id                 String    @id @default(uuid())
+  gatewayUuid        String    @unique @map("gateway_uuid")
+  firmwareVersion    String?   @map("firmware_version")
+  bootloaderVersion  String?   @map("bootloader_version")
+  provisioned        Boolean   @default(false)
+  lastSignalStrength Int?      @map("last_signal_strength")
+  lastCheckinTime    DateTime? @map("last_checkin_time")
+  assignedOn         DateTime? @map("assigned_on")
+  shippedOn          DateTime? @map("shipped_on")
+  organizationId     String?
+  organization       Organization? @relation(fields: [organizationId], references: [id])
+  patientId          String?
+  metadata           Json?
+
+  whitelistedDevices TenoviWhitelistedDevice[]
+  properties         TenoviGatewayProperty[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@map("tenovi_gateways")
+}
+
+model TenoviWhitelistedDevice {
+  id              String               @id @default(uuid())
+  gatewayId       String
+  gateway         TenoviGateway        @relation(fields: [gatewayId], references: [id], onDelete: Cascade)
+  sensorCode      String               @map("sensor_code")
+  macAddress      String               @map("mac_address")
+  whitelistStatus TenoviWhitelistStatus @default(PE) @map("whitelist_status")
+
+  created  DateTime @default(now())
+  modified DateTime @updatedAt
+
+  @@unique([gatewayId, macAddress])
+  @@map("tenovi_whitelisted_devices")
+}
+
+model TenoviGatewayProperty {
+  id        String        @id @default(uuid())
+  gatewayId String
+  gateway   TenoviGateway @relation(fields: [gatewayId], references: [id], onDelete: Cascade)
+  key       String
+  value     String?
+
+  @@map("tenovi_gateway_properties")
+}
+
+// ==================== TENOVI HWI DEVICE MODEL ====================
+
+model TenoviHwiDevice {
+  id                   String              @id @default(uuid())
+  hwiDeviceId          String              @unique @map("hwi_device_id")
+  tenoviId             String?             @map("tenovi_id")
+  status               TenoviDeviceStatus  @default(inactive)
+  connectedOn          DateTime?           @map("connected_on")
+  unlinkedOn           DateTime?           @map("unlinked_on")
+  lastMeasurement      DateTime?           @map("last_measurement")
+
+  // Device details
+  deviceName           String?             @map("device_name")
+  hardwareUuid         String?             @map("hardware_uuid")
+  sensorCode           String?             @map("sensor_code")
+  sensorId             String?             @map("sensor_id")
+  deviceTypeId         String?             @map("device_type_id")
+  modelNumber          String?             @map("model_number")
+  sharedHardwareUuid   Boolean             @default(false) @map("shared_hardware_uuid")
+
+  // Fulfillment details
+  fulfillmentCreated   DateTime?           @map("fulfillment_created")
+  shippingStatus       TenoviShippingStatus? @map("shipping_status")
+  shippingName         String?             @map("shipping_name")
+  shippingAddress      String?             @map("shipping_address")
+  shippingCity         String?             @map("shipping_city")
+  shippingState        String?             @map("shipping_state")
+  shippingZipCode      String?             @map("shipping_zip_code")
+  shippingTrackingLink String?             @map("shipping_tracking_link")
+  shippedOn            DateTime?           @map("shipped_on")
+  deliveredOn          DateTime?           @map("delivered_on")
+  fulfilled            Boolean             @default(false)
+
+  // Patient assignment
+  tenoviPatientId      String?             @map("tenovi_patient_id")
+  patientPhoneNumber   String?             @map("patient_phone_number")
+  patientId            String?
+  patient              User?               @relation("TenoviDevicePatient", fields: [patientId], references: [id])
+  organizationId       String?
+  organization         Organization?       @relation("TenoviDeviceOrganization", fields: [organizationId], references: [id])
+
+  // Tenovi patient data (denormalized)
+  patientExternalId    String?             @map("patient_external_id")
+  patientName          String?             @map("patient_name")
+  patientEmail         String?             @map("patient_email")
+  physician            String?
+  clinicName           String?             @map("clinic_name")
+  careManager          String?             @map("care_manager")
+  smsOptIn             Boolean             @default(false) @map("sms_opt_in")
+
+  // Metadata
+  metadata             Json?
+  fulfillmentMetadata  Json?               @map("fulfillment_metadata")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([patientId])
+  @@index([organizationId])
+  @@index([hardwareUuid])
+  @@map("tenovi_hwi_devices")
+}
+
+// ==================== INVOICE MODEL ====================
+
+model Invoice {
+  id                    String        @id @default(uuid())
+  organizationId        String?
+  userId                String?
+  user                  User?         @relation(fields: [userId], references: [id])
+  status                InvoiceStatus @default(draft)
+  stripeInvoiceId       String?       @unique @map("stripe_invoice_id")
+  stripePaymentIntentId String?       @map("stripe_payment_intent_id")
+  subtotal              Decimal       @db.Decimal(10, 2)
+  tax                   Decimal       @default(0) @db.Decimal(10, 2)
+  total                 Decimal       @db.Decimal(10, 2)
+  currency              String?
+  periodStart           DateTime?     @map("period_start")
+  periodEnd             DateTime?     @map("period_end")
+  dueDate               DateTime?     @map("due_date")
+  paidAt                DateTime?     @map("paid_at")
+  invoicePdfUrl         String?       @map("invoice_pdf_url")
+  hostedInvoiceUrl      String?       @map("hosted_invoice_url")
+  lineItems             Json?         @map("line_items")
+  metadata              Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId, status])
+  @@map("invoices")
+}
+
+// ==================== REPORT MODEL ====================
+
+model Report {
+  id             String       @id @default(uuid())
+  type           ReportType
+  title          String
+  status         ReportStatus @default(pending)
+  organizationId String?
+  patientId      String?
+  createdById    String       @map("created_by_id")
+  createdBy      User         @relation(fields: [createdById], references: [id])
+  parameters     Json?
+  format         String       @default("pdf")
+  fileUrl        String?      @map("file_url")
+  fileSize       BigInt?      @map("file_size")
+  completedAt    DateTime?    @map("completed_at")
+  error          String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("reports")
+}
+
+// ==================== API KEY MODEL ====================
+
+model ApiKey {
+  id             String    @id @default(uuid())
+  name           String
+  keyHash        String    @map("key_hash")
+  keyPrefix      String    @map("key_prefix")
+  scopes         String[]
+  organizationId String?
+  createdById    String    @map("created_by_id")
+  createdBy      User      @relation(fields: [createdById], references: [id])
+  rateLimit      Int       @default(1000) @map("rate_limit")
+  expiresAt      DateTime? @map("expires_at")
+  lastUsedAt     DateTime? @map("last_used_at")
+  usageCount     Int       @default(0) @map("usage_count")
+  isActive       Boolean   @default(true) @map("is_active")
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("api_keys")
+}
+
+// ==================== MESSAGING MODELS ====================
+
+model MessageThread {
+  id            String    @id @default(uuid())
+  subject       String?
+  createdById   String?   @map("created_by_id")
+  createdBy     User?     @relation("ThreadCreator", fields: [createdById], references: [id])
+  lastMessageId String?   @map("last_message_id")
+
+  messages     Message[]
+  participants MessageThreadParticipant[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("message_threads")
+}
+
+model MessageThreadParticipant {
+  id       String        @id @default(uuid())
+  threadId String        @map("thread_id")
+  thread   MessageThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  userId   String        @map("user_id")
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([threadId, userId])
+  @@map("message_thread_participants")
+}
+
+model Message {
+  id          String        @id @default(uuid())
+  threadId    String        @map("thread_id")
+  thread      MessageThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  senderId    String        @map("sender_id")
+  sender      User          @relation(fields: [senderId], references: [id])
+  content     String
+  attachments Json?
+  readAt      DateTime?     @map("read_at")
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("messages")
+}
+
+// ==================== APPOINTMENT MODEL ====================
+
+model Appointment {
+  id                 String            @id @default(uuid())
+  patientId          String            @map("patient_id")
+  patient            User              @relation("AppointmentPatient", fields: [patientId], references: [id])
+  providerId         String            @map("provider_id")
+  provider           User              @relation("AppointmentProvider", fields: [providerId], references: [id])
+  type               AppointmentType   @default(telehealth)
+  status             AppointmentStatus @default(scheduled)
+  title              String
+  description        String?
+  scheduledAt        DateTime          @map("scheduled_at")
+  durationMinutes    Int               @default(30) @map("duration_minutes")
+  location           String?
+  telehealthUrl      String?           @map("telehealth_url")
+  notes              String?
+  cancelledBy        String?           @map("cancelled_by")
+  cancellationReason String?           @map("cancellation_reason")
+  organizationId     String?           @map("organization_id")
+  reminders          Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("appointments")
+}

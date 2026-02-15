@@ -1,5 +1,7 @@
 "use client";
 
+import { useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -8,7 +10,6 @@ import {
   Heart,
   Droplet,
   Scale,
-  Thermometer,
   TrendingUp,
   TrendingDown,
   Minus,
@@ -21,6 +22,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { formatRelativeTime } from "@/lib/utils";
+import { useToast } from "@/hooks/useToast";
 
 // Mock vitals data
 const vitals = [
@@ -70,12 +72,6 @@ const vitals = [
   },
 ];
 
-const medications = [
-  { name: "Lisinopril 10mg", time: "8:00 AM", taken: true },
-  { name: "Metformin 500mg", time: "8:00 AM", taken: true },
-  { name: "Metformin 500mg", time: "6:00 PM", taken: false },
-  { name: "Aspirin 81mg", time: "8:00 PM", taken: false },
-];
 
 const aiInsights = [
   {
@@ -114,6 +110,46 @@ const appointments = [
 ];
 
 export default function PatientDashboard() {
+  const router = useRouter();
+  const { toast } = useToast();
+  const [medications, setMedications] = useState([
+    { name: "Lisinopril 10mg", time: "8:00 AM", taken: true },
+    { name: "Metformin 500mg", time: "8:00 AM", taken: true },
+    { name: "Metformin 500mg", time: "6:00 PM", taken: false },
+    { name: "Aspirin 81mg", time: "8:00 PM", taken: false },
+  ]);
+
+  const handleMessageCareTeam = useCallback(() => {
+    router.push('/patient/messages');
+  }, [router]);
+
+  const handleViewAllMedications = useCallback(() => {
+    router.push('/patient/medications');
+  }, [router]);
+
+  const handleScheduleAppointment = useCallback(() => {
+    router.push('/patient/appointments?action=schedule');
+  }, [router]);
+
+  const handleViewAppointment = useCallback((appointmentTitle: string) => {
+    toast({ title: 'Appointment Details', description: `Viewing ${appointmentTitle}`, type: 'info' });
+    router.push('/patient/appointments');
+  }, [router, toast]);
+
+  const handleToggleMedication = useCallback((index: number) => {
+    setMedications(prev => prev.map((med, i) => 
+      i === index ? { ...med, taken: !med.taken } : med
+    ));
+    const med = medications[index];
+    if (!med.taken) {
+      toast({ title: 'Medication marked as taken', description: med.name, type: 'success' });
+    }
+  }, [medications, toast]);
+
+  const handleViewVital = useCallback((vitalType: string) => {
+    router.push(`/patient/vitals?type=${encodeURIComponent(vitalType)}`);
+  }, [router]);
+
   const getTrendIcon = (trend: string) => {
     switch (trend) {
       case "up":
@@ -141,6 +177,7 @@ export default function PatientDashboard() {
               <Button
                 variant="outline"
                 className="bg-white/10 border-white/30 text-white hover:bg-white/20"
+                onClick={handleMessageCareTeam}
               >
                 <MessageSquare className="h-4 w-4 mr-2" />
                 Message Care Team
@@ -249,7 +286,7 @@ export default function PatientDashboard() {
                     <Pill className="h-5 w-5 text-blue-500" />
                     Today&apos;s Medications
                   </CardTitle>
-                  <Button variant="ghost" size="sm">
+                  <Button variant="ghost" size="sm" onClick={handleViewAllMedications}>
                     View All
                   </Button>
                 </div>
@@ -266,11 +303,13 @@ export default function PatientDashboard() {
                   >
                     <div className="flex items-center gap-3">
                       <button
+                        onClick={() => handleToggleMedication(index)}
                         className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${
                           med.taken
                             ? "bg-emerald-500 border-emerald-500 text-white"
                             : "border-slate-300 dark:border-slate-600 hover:border-emerald-500"
                         }`}
+                        aria-label={med.taken ? "Mark as not taken" : "Mark as taken"}
                       >
                         {med.taken && <Check className="h-3 w-3" />}
                       </button>
@@ -305,7 +344,7 @@ export default function PatientDashboard() {
                 <Calendar className="h-5 w-5 text-blue-500" />
                 Upcoming Appointments
               </CardTitle>
-              <Button variant="ghost" size="sm">
+              <Button variant="ghost" size="sm" onClick={handleScheduleAppointment}>
                 Schedule New
               </Button>
             </div>
@@ -315,7 +354,8 @@ export default function PatientDashboard() {
               {appointments.map((apt, index) => (
                 <div
                   key={index}
-                  className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-700/50 rounded-xl"
+                  onClick={() => handleViewAppointment(apt.title)}
+                  className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-700/50 rounded-xl cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                 >
                   <div className="flex items-center gap-4">
                     <div

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -117,13 +118,15 @@ export default function RegisterPage() {
       <div className="w-full max-w-lg">
         {/* Logo */}
         <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center gap-2">
-            <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-emerald-500 rounded-xl flex items-center justify-center">
-              <Activity className="h-7 w-7 text-white" />
-            </div>
-            <span className="text-2xl font-bold text-slate-900 dark:text-white">
-              VitalWatch<span className="text-blue-600">AI</span>
-            </span>
+          <Link href="/" className="inline-flex items-center justify-center">
+            <Image
+              src="/logo.png"
+              alt="VytalWatch AI"
+              width={280}
+              height={90}
+              className="h-24 w-auto"
+              priority
+            />
           </Link>
           <h1 className="mt-6 text-2xl font-bold text-slate-900 dark:text-white">
             Create your account

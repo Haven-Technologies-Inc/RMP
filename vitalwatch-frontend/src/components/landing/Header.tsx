@@ -2,10 +2,10 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { Button } from "@/components/ui/Button";
 import { useTheme } from "next-themes";
 import {
-  Activity,
   Menu,
   X,
   Sun,
@@ -19,10 +19,9 @@ const navigation = [
     name: "Product",
     href: "#",
     children: [
-      { name: "Features", href: "#features" },
-      { name: "AI Insights", href: "#ai" },
-      { name: "Devices", href: "#devices" },
-      { name: "Integrations", href: "#integrations" },
+      { name: "Features", href: "/features" },
+      { name: "AI Insights", href: "/ai" },
+      { name: "Devices", href: "/devices" },
     ],
   },
   { name: "Pricing", href: "#pricing" },
@@ -67,13 +66,16 @@ export function Header() {
       <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 lg:h-20">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-emerald-500 rounded-xl flex items-center justify-center">
-              <Activity className="h-6 w-6 text-white" />
-            </div>
-            <span className="text-xl font-bold text-slate-900 dark:text-white">
-              VitalWatch<span className="text-blue-600">AI</span>
-            </span>
+          <Link href="/" className="flex items-center">
+            <Image
+              src="/logo.png"
+              alt="VytalWatch AI"
+              width={140}
+              height={48}
+              className="h-12"
+              style={{ width: 'auto', height: 'auto', maxHeight: '3rem' }}
+              priority
+            />
           </Link>
 
           {/* Desktop Navigation */}

@@ -64,6 +64,30 @@ export function TopBar({ onMenuClick, showMenuButton = false }: TopBarProps) {
     router.push("/");
   };
 
+  // Get role-based paths for profile and settings
+  const getRolePath = (path: string) => {
+    const role = user?.role?.toLowerCase();
+    switch (role) {
+      case 'superadmin':
+      case 'admin':
+        return `/admin/${path}`;
+      case 'provider':
+        return `/provider/${path}`;
+      case 'patient':
+        return `/patient/${path}`;
+      default:
+        return `/patient/${path}`;
+    }
+  };
+
+  const handleNavigateToProfile = () => {
+    router.push(getRolePath('profile'));
+  };
+
+  const handleNavigateToSettings = () => {
+    router.push(getRolePath('settings'));
+  };
+
   return (
     <header className="h-16 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-4 lg:px-6">
       {/* Left Section */}
@@ -72,6 +96,7 @@ export function TopBar({ onMenuClick, showMenuButton = false }: TopBarProps) {
           <button
             onClick={onMenuClick}
             className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 lg:hidden"
+            aria-label="Toggle menu"
           >
             <Menu className="h-5 w-5 text-slate-600 dark:text-slate-400" />
           </button>
@@ -115,7 +140,7 @@ export function TopBar({ onMenuClick, showMenuButton = false }: TopBarProps) {
           onOpenChange={setShowNotifications}
         >
           <DropdownMenu.Trigger asChild>
-            <button className="relative p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400">
+            <button className="relative p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400" aria-label="Notifications">
               <Bell className="h-5 w-5" />
               <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
             </button>
@@ -213,14 +238,20 @@ export function TopBar({ onMenuClick, showMenuButton = false }: TopBarProps) {
                 </p>
               </div>
 
-              <DropdownMenu.Item className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer outline-none">
+              <DropdownMenu.Item
+                onClick={handleNavigateToProfile}
+                className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer outline-none"
+              >
                 <User className="h-4 w-4 text-slate-500" />
                 <span className="text-sm text-slate-700 dark:text-slate-300">
                   Profile
                 </span>
               </DropdownMenu.Item>
 
-              <DropdownMenu.Item className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer outline-none">
+              <DropdownMenu.Item
+                onClick={handleNavigateToSettings}
+                className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer outline-none"
+              >
                 <Settings className="h-4 w-4 text-slate-500" />
                 <span className="text-sm text-slate-700 dark:text-slate-300">
                   Settings

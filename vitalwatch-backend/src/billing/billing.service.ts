@@ -82,9 +82,7 @@ export class BillingService {
   private initializeStripe(): void {
     const secretKey = this.configService.get('stripe.secretKey');
     if (secretKey) {
-      this.stripe = new Stripe(secretKey, {
-        apiVersion: '2023-10-16',
-      });
+      this.stripe = new Stripe(secretKey);
     }
   }
 
@@ -133,8 +131,8 @@ export class BillingService {
       monthlyPrice: planConfig.monthlyPrice,
       patientLimit: planConfig.patientLimit,
       providerLimit: planConfig.providerLimit,
-      currentPeriodStart: new Date(stripeSubscription.current_period_start * 1000),
-      currentPeriodEnd: new Date(stripeSubscription.current_period_end * 1000),
+      currentPeriodStart: new Date((stripeSubscription as any).current_period_start * 1000),
+      currentPeriodEnd: new Date((stripeSubscription as any).current_period_end * 1000),
     });
 
     const saved = await this.subscriptionRepository.save(subscription);
@@ -188,98 +186,30 @@ export class BillingService {
     return updated;
   }
 
-  async handleStripeWebhook(event: Stripe.Event): Promise<void> {
-    this.logger.log(`Processing Stripe webhook: ${event.type}`);
-
-    switch (event.type) {
-      case 'invoice.paid':
-        await this.handleInvoicePaid(event.data.object as Stripe.Invoice);
-        break;
-      case 'invoice.payment_failed':
-        await this.handleInvoicePaymentFailed(event.data.object as Stripe.Invoice);
-        break;
-      case 'customer.subscription.updated':
-        await this.handleSubscriptionUpdated(event.data.object as Stripe.Subscription);
-        break;
-      case 'customer.subscription.deleted':
-        await this.handleSubscriptionDeleted(event.data.object as Stripe.Subscription);
-        break;
-    }
-  }
-
-  private async handleInvoicePaid(stripeInvoice: Stripe.Invoice): Promise<void> {
-    const subscription = await this.subscriptionRepository.findOne({
-      where: { stripeCustomerId: stripeInvoice.customer as string },
-    });
-
-    if (subscription) {
-      subscription.status = SubscriptionStatus.ACTIVE;
-      await this.subscriptionRepository.save(subscription);
-    }
-
-    // Create invoice record
-    await this.createInvoiceFromStripe(stripeInvoice);
-  }
-
-  private async handleInvoicePaymentFailed(stripeInvoice: Stripe.Invoice): Promise<void> {
-    const subscription = await this.subscriptionRepository.findOne({
-      where: { stripeCustomerId: stripeInvoice.customer as string },
-    });
-
-    if (subscription) {
-      subscription.status = SubscriptionStatus.PAST_DUE;
-      await this.subscriptionRepository.save(subscription);
-    }
-  }
-
-  private async handleSubscriptionUpdated(stripeSubscription: Stripe.Subscription): Promise<void> {
-    const subscription = await this.subscriptionRepository.findOne({
-      where: { stripeSubscriptionId: stripeSubscription.id },
-    });
-
-    if (subscription) {
-      subscription.status = stripeSubscription.status as SubscriptionStatus;
-      subscription.currentPeriodStart = new Date(stripeSubscription.current_period_start * 1000);
-      subscription.currentPeriodEnd = new Date(stripeSubscription.current_period_end * 1000);
-      await this.subscriptionRepository.save(subscription);
-    }
-  }
-
-  private async handleSubscriptionDeleted(stripeSubscription: Stripe.Subscription): Promise<void> {
-    const subscription = await this.subscriptionRepository.findOne({
-      where: { stripeSubscriptionId: stripeSubscription.id },
-    });
-
-    if (subscription) {
-      subscription.status = SubscriptionStatus.CANCELED;
-      subscription.canceledAt = new Date();
-      await this.subscriptionRepository.save(subscription);
-    }
-  }
-
   private async createInvoiceFromStripe(stripeInvoice: Stripe.Invoice): Promise<Invoice> {
     const subscription = await this.subscriptionRepository.findOne({
       where: { stripeCustomerId: stripeInvoice.customer as string },
     });
 
-    const invoice = this.invoiceRepository.create({
+    const invoiceData: any = {
       userId: subscription?.userId,
       organizationId: subscription?.organizationId,
-      status: stripeInvoice.paid ? InvoiceStatus.PAID : InvoiceStatus.OPEN,
+      status: (stripeInvoice as any).paid ? InvoiceStatus.PAID : InvoiceStatus.OPEN,
       stripeInvoiceId: stripeInvoice.id,
-      stripePaymentIntentId: stripeInvoice.payment_intent as string,
+      stripePaymentIntentId: (stripeInvoice as any).payment_intent as string,
       subtotal: stripeInvoice.subtotal / 100,
-      tax: stripeInvoice.tax ? stripeInvoice.tax / 100 : 0,
+      tax: (stripeInvoice as any).tax ? (stripeInvoice as any).tax / 100 : 0,
       total: stripeInvoice.total / 100,
       currency: stripeInvoice.currency,
       periodStart: stripeInvoice.period_start ? new Date(stripeInvoice.period_start * 1000) : null,
       periodEnd: stripeInvoice.period_end ? new Date(stripeInvoice.period_end * 1000) : null,
-      paidAt: stripeInvoice.paid ? new Date() : null,
+      paidAt: (stripeInvoice as any).paid ? new Date() : null,
       invoicePdfUrl: stripeInvoice.invoice_pdf || undefined,
       hostedInvoiceUrl: stripeInvoice.hosted_invoice_url || undefined,
-    });
+    };
 
-    return this.invoiceRepository.save(invoice);
+    const invoice = this.invoiceRepository.create(invoiceData);
+    return this.invoiceRepository.save(invoice) as unknown as Invoice;
   }
 
   // CPT Billing Records
@@ -481,5 +411,321 @@ export class BillingService {
     const [invoices, total] = await queryBuilder.getManyAndCount();
 
     return { invoices, total };
+  }
+
+  async getInvoice(id: string): Promise<Invoice> {
+    const invoice = await this.invoiceRepository.findOne({ where: { id } });
+    if (!invoice) {
+      throw new NotFoundException('Invoice not found');
+    }
+    return invoice;
+  }
+
+  // Customer Management
+  async createStripeCustomer(dto: { email: string; name: string; organizationId?: string }, user: any): Promise<any> {
+    if (!this.stripe) {
+      throw new BadRequestException('Stripe is not configured');
+    }
+
+    const customer = await this.stripe.customers.create({
+      email: dto.email,
+      name: dto.name,
+      metadata: {
+        organizationId: dto.organizationId || '',
+        createdBy: user.sub,
+      },
+    });
+
+    await this.auditService.log({
+      action: 'STRIPE_CUSTOMER_CREATED',
+      userId: user.sub,
+      details: { customerId: customer.id },
+    });
+
+    return customer;
+  }
+
+  async getStripeCustomer(customerId: string): Promise<any> {
+    if (!this.stripe) {
+      throw new BadRequestException('Stripe is not configured');
+    }
+
+    return this.stripe.customers.retrieve(customerId);
+  }
+
+  async getCurrentCustomer(user: any): Promise<any> {
+    const subscription = await this.subscriptionRepository.findOne({
+      where: { userId: user.sub },
+    });
+
+    if (!subscription?.stripeCustomerId) {
+      return null;
+    }
+
+    return this.getStripeCustomer(subscription.stripeCustomerId);
+  }
+
+  // Checkout Session
+  async createCheckoutSession(dto: { priceId: string; successUrl: string; cancelUrl: string }, user: any): Promise<any> {
+    if (!this.stripe) {
+      throw new BadRequestException('Stripe is not configured');
+    }
+
+    const subscription = await this.subscriptionRepository.findOne({
+      where: { userId: user.sub },
+    });
+
+    const session = await this.stripe.checkout.sessions.create({
+      mode: 'subscription',
+      payment_method_types: ['card'],
+      line_items: [{ price: dto.priceId, quantity: 1 }],
+      success_url: dto.successUrl,
+      cancel_url: dto.cancelUrl,
+      customer: subscription?.stripeCustomerId || undefined,
+      metadata: { userId: user.sub, organizationId: user.organizationId || '' },
+    });
+
+    return { sessionId: session.id, url: session.url };
+  }
+
+  // Payment Methods
+  async getPaymentMethods(user: any): Promise<any[]> {
+    if (!this.stripe) {
+      throw new BadRequestException('Stripe is not configured');
+    }
+
+    const subscription = await this.subscriptionRepository.findOne({
+      where: { userId: user.sub },
+    });
+
+    if (!subscription?.stripeCustomerId) {
+      return [];
+    }
+
+    const methods = await this.stripe.paymentMethods.list({
+      customer: subscription.stripeCustomerId,
+      type: 'card',
+    });
+
+    return methods.data;
+  }
+
+  async addPaymentMethod(paymentMethodId: string, user: any): Promise<any> {
+    if (!this.stripe) {
+      throw new BadRequestException('Stripe is not configured');
+    }
+
+    const subscription = await this.subscriptionRepository.findOne({
+      where: { userId: user.sub },
+    });
+
+    if (!subscription?.stripeCustomerId) {
+      throw new BadRequestException('No customer found');
+    }
+
+    const paymentMethod = await this.stripe.paymentMethods.attach(paymentMethodId, {
+      customer: subscription.stripeCustomerId,
+    });
+
+    await this.auditService.log({
+      action: 'PAYMENT_METHOD_ADDED',
+      userId: user.sub,
+      details: { paymentMethodId },
+    });
+
+    return paymentMethod;
+  }
+
+  async deletePaymentMethod(paymentMethodId: string, user: any): Promise<void> {
+    if (!this.stripe) {
+      throw new BadRequestException('Stripe is not configured');
+    }
+
+    await this.stripe.paymentMethods.detach(paymentMethodId);
+
+    await this.auditService.log({
+      action: 'PAYMENT_METHOD_DELETED',
+      userId: user.sub,
+      details: { paymentMethodId },
+    });
+  }
+
+  async setDefaultPaymentMethod(paymentMethodId: string, user: any): Promise<any> {
+    if (!this.stripe) {
+      throw new BadRequestException('Stripe is not configured');
+    }
+
+    const subscription = await this.subscriptionRepository.findOne({
+      where: { userId: user.sub },
+    });
+
+    if (!subscription?.stripeCustomerId) {
+      throw new BadRequestException('No customer found');
+    }
+
+    await this.stripe.customers.update(subscription.stripeCustomerId, {
+      invoice_settings: { default_payment_method: paymentMethodId },
+    });
+
+    return { success: true };
+  }
+
+  // Usage
+  async getUsage(user: any, options: { startDate?: string; endDate?: string }): Promise<any> {
+    const records = await this.billingRecordRepository.find({
+      where: { organizationId: user.organizationId },
+    });
+
+    const totalBillable = records.reduce((sum, r) => sum + Number(r.amount), 0);
+    
+    return {
+      totalBillable,
+      recordCount: records.length,
+      byCode: {
+        [CPTCode.INITIAL_SETUP]: records.filter(r => r.cptCode === CPTCode.INITIAL_SETUP).length,
+        [CPTCode.DEVICE_SUPPLY]: records.filter(r => r.cptCode === CPTCode.DEVICE_SUPPLY).length,
+        [CPTCode.CLINICAL_REVIEW_20]: records.filter(r => r.cptCode === CPTCode.CLINICAL_REVIEW_20).length,
+        [CPTCode.CLINICAL_REVIEW_ADDITIONAL]: records.filter(r => r.cptCode === CPTCode.CLINICAL_REVIEW_ADDITIONAL).length,
+      },
+      period: options,
+    };
+  }
+
+  // Pricing Plans
+  async getPricingPlans(): Promise<any[]> {
+    return [
+      {
+        id: 'starter',
+        name: 'Starter',
+        price: 299,
+        interval: 'month',
+        features: ['Up to 50 patients', '3 providers', 'Basic analytics', 'Email support'],
+        patientLimit: 50,
+        providerLimit: 3,
+      },
+      {
+        id: 'pro',
+        name: 'Pro',
+        price: 799,
+        interval: 'month',
+        features: ['Up to 200 patients', '10 providers', 'Advanced analytics', 'Priority support', 'API access'],
+        patientLimit: 200,
+        providerLimit: 10,
+        popular: true,
+      },
+      {
+        id: 'enterprise',
+        name: 'Enterprise',
+        price: null,
+        interval: 'month',
+        features: ['Unlimited patients', 'Unlimited providers', 'Custom integrations', 'Dedicated support', 'SLA guarantee'],
+        patientLimit: -1,
+        providerLimit: -1,
+        custom: true,
+      },
+    ];
+  }
+
+  async getPricingPlan(id: string): Promise<any> {
+    const plans = await this.getPricingPlans();
+    return plans.find(p => p.id === id);
+  }
+
+  // Setup Intent
+  async createSetupIntent(user: any): Promise<any> {
+    if (!this.stripe) {
+      throw new BadRequestException('Stripe is not configured');
+    }
+
+    const subscription = await this.subscriptionRepository.findOne({
+      where: { userId: user.sub },
+    });
+
+    const setupIntent = await this.stripe.setupIntents.create({
+      customer: subscription?.stripeCustomerId || undefined,
+      payment_method_types: ['card'],
+    });
+
+    return { clientSecret: setupIntent.client_secret };
+  }
+
+  // Stripe Webhook
+  async handleStripeWebhook(rawBody: Buffer, signature: string): Promise<any> {
+    if (!this.stripe) {
+      throw new BadRequestException('Stripe is not configured');
+    }
+
+    const webhookSecret = this.configService.get('stripe.webhookSecret');
+    
+    let event: Stripe.Event;
+    try {
+      event = this.stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
+    } catch (err) {
+      this.logger.error('Webhook signature verification failed', err);
+      throw new BadRequestException('Invalid webhook signature');
+    }
+
+    switch (event.type) {
+      case 'customer.subscription.updated':
+      case 'customer.subscription.deleted':
+        await this.handleSubscriptionUpdate(event.data.object as Stripe.Subscription);
+        break;
+      case 'invoice.paid':
+        await this.handleInvoicePaid(event.data.object as Stripe.Invoice);
+        break;
+      case 'invoice.payment_failed':
+        await this.handleInvoicePaymentFailed(event.data.object as Stripe.Invoice);
+        break;
+    }
+
+    return { received: true };
+  }
+
+  private async handleSubscriptionUpdate(stripeSubscription: Stripe.Subscription): Promise<void> {
+    const subscription = await this.subscriptionRepository.findOne({
+      where: { stripeSubscriptionId: stripeSubscription.id },
+    });
+
+    if (subscription) {
+      subscription.status = this.mapStripeStatus(stripeSubscription.status);
+      subscription.currentPeriodEnd = new Date((stripeSubscription as any).current_period_end * 1000);
+      await this.subscriptionRepository.save(subscription);
+    }
+  }
+
+  private async handleInvoicePaid(stripeInvoice: Stripe.Invoice): Promise<void> {
+    const invoice = await this.invoiceRepository.findOne({
+      where: { stripeInvoiceId: stripeInvoice.id },
+    });
+
+    if (invoice) {
+      invoice.status = InvoiceStatus.PAID;
+      invoice.paidAt = new Date();
+      await this.invoiceRepository.save(invoice);
+    }
+  }
+
+  private async handleInvoicePaymentFailed(stripeInvoice: Stripe.Invoice): Promise<void> {
+    const invoice = await this.invoiceRepository.findOne({
+      where: { stripeInvoiceId: stripeInvoice.id },
+    });
+
+    if (invoice) {
+      invoice.status = InvoiceStatus.FAILED;
+      await this.invoiceRepository.save(invoice);
+    }
+  }
+
+  private mapStripeStatus(status: Stripe.Subscription.Status): SubscriptionStatus {
+    const mapping: Record<string, SubscriptionStatus> = {
+      active: SubscriptionStatus.ACTIVE,
+      past_due: SubscriptionStatus.PAST_DUE,
+      canceled: SubscriptionStatus.CANCELED,
+      incomplete: SubscriptionStatus.INCOMPLETE,
+      incomplete_expired: SubscriptionStatus.INCOMPLETE,
+      trialing: SubscriptionStatus.TRIALING,
+      unpaid: SubscriptionStatus.PAST_DUE,
+    };
+    return mapping[status] || SubscriptionStatus.INCOMPLETE;
   }
 }

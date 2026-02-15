@@ -1,12 +1,26 @@
-import { Controller, Get } from '@nestjs/common';
-import { AppService } from './app.service';
+import { Controller, Get, Res } from '@nestjs/common';
+import { Response } from 'express';
 
 @Controller()
 export class AppController {
-  constructor(private readonly appService: AppService) {}
-
   @Get()
-  getHello(): string {
-    return this.appService.getHello();
+  getRoot() {
+    return {
+      name: 'VytalWatch AI API',
+      version: '1.0.0',
+      status: 'running',
+      documentation: '/api/v1',
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  @Get('favicon.ico')
+  getFavicon(@Res() res: Response) {
+    res.status(204).send();
+  }
+
+  @Get('health')
+  getHealth() {
+    return { status: 'ok', timestamp: new Date().toISOString() };
   }
 }

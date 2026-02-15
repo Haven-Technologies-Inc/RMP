@@ -303,4 +303,43 @@ export class VitalsService {
       throw new NotFoundException('Vital reading not found');
     }
   }
+
+  async getVitalsHistory(
+    patientId: string,
+    options?: { startDate?: Date; endDate?: Date; limit?: number; page?: number },
+  ): Promise<{ vitals: VitalReading[]; total: number }> {
+    const { startDate, endDate, limit = 50, page = 1 } = options || {};
+
+    const queryBuilder = this.vitalRepository
+      .createQueryBuilder('vital')
+      .where('vital.patientId = :patientId', { patientId });
+
+    if (startDate && endDate) {
+      queryBuilder.andWhere('vital.recordedAt BETWEEN :startDate AND :endDate', { startDate, endDate });
+    } else if (startDate) {
+      queryBuilder.andWhere('vital.recordedAt >= :startDate', { startDate });
+    } else if (endDate) {
+      queryBuilder.andWhere('vital.recordedAt <= :endDate', { endDate });
+    }
+
+    queryBuilder
+      .orderBy('vital.recordedAt', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    const [vitals, total] = await queryBuilder.getManyAndCount();
+    return { vitals, total };
+  }
+
+  async getVitalsByType(
+    patientId: string,
+    type: VitalType,
+    limit: number = 50,
+  ): Promise<VitalReading[]> {
+    return this.vitalRepository.find({
+      where: { patientId, type },
+      order: { recordedAt: 'DESC' },
+      take: limit,
+    });
+  }
 }

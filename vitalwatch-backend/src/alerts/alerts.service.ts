@@ -100,14 +100,16 @@ export class AlertsService {
   }
 
   private getAlertTitle(vitalType: VitalType, status: VitalStatus): string {
-    const typeNames: Record<VitalType, string> = {
+    const typeNames: Partial<Record<VitalType, string>> = {
       [VitalType.BLOOD_PRESSURE]: 'Blood Pressure',
       [VitalType.HEART_RATE]: 'Heart Rate',
       [VitalType.BLOOD_GLUCOSE]: 'Blood Glucose',
+      [VitalType.GLUCOSE]: 'Glucose',
       [VitalType.SPO2]: 'Oxygen Saturation',
       [VitalType.TEMPERATURE]: 'Temperature',
       [VitalType.WEIGHT]: 'Weight',
       [VitalType.RESPIRATORY_RATE]: 'Respiratory Rate',
+      [VitalType.ECG]: 'ECG',
     };
 
     const statusText = status === VitalStatus.CRITICAL ? 'Critical' : 'Abnormal';
@@ -152,7 +154,7 @@ export class AlertsService {
       // Update alert notification status
       await this.alertRepository.update(alert.id, {
         notificationSent: true,
-        notificationSentAt: new Date(),
+        lastNotificationAt: new Date(),
       });
     } catch (error) {
       this.logger.error(`Failed to send alert notifications for alert ${alert.id}`, error);
@@ -321,5 +323,21 @@ export class AlertsService {
     );
 
     return result.affected || 0;
+  }
+
+  async findByPatient(
+    patientId: string,
+    status?: AlertStatus,
+  ): Promise<Alert[]> {
+    const where: any = { patientId };
+    if (status) {
+      where.status = status;
+    }
+
+    return this.alertRepository.find({
+      where,
+      order: { createdAt: 'DESC' },
+      relations: ['vitalReading'],
+    });
   }
 }

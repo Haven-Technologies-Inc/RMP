@@ -1,6 +1,7 @@
 import {
   Controller,
   Post,
+  Get,
   Body,
   HttpCode,
   HttpStatus,
@@ -8,6 +9,7 @@ import {
   Request,
   Ip,
   BadRequestException,
+  Query,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -50,6 +52,28 @@ class ResetPasswordDto {
 }
 
 class VerifyEmailDto {
+  token: string;
+}
+
+class VerifySmsDto {
+  phone: string;
+  code: string;
+}
+
+class SendSmsCodeDto {
+  phone: string;
+}
+
+class SocialLoginDto {
+  token: string;
+  provider: 'google' | 'microsoft' | 'apple';
+}
+
+class MagicLinkDto {
+  email: string;
+}
+
+class VerifyMagicLinkDto {
   token: string;
 }
 
@@ -126,5 +150,67 @@ export class AuthController {
   async verifyEmail(@Body() dto: VerifyEmailDto) {
     await this.authService.verifyEmail(dto.token);
     return { message: 'Email verified successfully' };
+  }
+
+  @Public()
+  @Post('send-sms-code')
+  @HttpCode(HttpStatus.OK)
+  async sendSmsCode(@Body() dto: SendSmsCodeDto) {
+    await this.authService.sendSmsVerificationCode(dto.phone);
+    return { message: 'Verification code sent' };
+  }
+
+  @Public()
+  @Post('verify-sms')
+  @HttpCode(HttpStatus.OK)
+  async verifySms(@Body() dto: VerifySmsDto) {
+    await this.authService.verifySmsCode(dto.phone, dto.code);
+    return { message: 'Phone verified successfully' };
+  }
+
+  @Public()
+  @Post('social/google')
+  @HttpCode(HttpStatus.OK)
+  async googleLogin(@Body() dto: SocialLoginDto, @Ip() ip: string) {
+    const user = await this.authService.validateSocialLogin('google', dto.token);
+    return this.authService.login(user, ip);
+  }
+
+  @Public()
+  @Post('social/microsoft')
+  @HttpCode(HttpStatus.OK)
+  async microsoftLogin(@Body() dto: SocialLoginDto, @Ip() ip: string) {
+    const user = await this.authService.validateSocialLogin('microsoft', dto.token);
+    return this.authService.login(user, ip);
+  }
+
+  @Public()
+  @Post('social/apple')
+  @HttpCode(HttpStatus.OK)
+  async appleLogin(@Body() dto: SocialLoginDto, @Ip() ip: string) {
+    const user = await this.authService.validateSocialLogin('apple', dto.token);
+    return this.authService.login(user, ip);
+  }
+
+  @Public()
+  @Post('magic-link')
+  @HttpCode(HttpStatus.OK)
+  async requestMagicLink(@Body() dto: MagicLinkDto) {
+    await this.authService.sendMagicLink(dto.email);
+    return { message: 'If an account exists, a magic link has been sent' };
+  }
+
+  @Public()
+  @Post('magic-link/verify')
+  @HttpCode(HttpStatus.OK)
+  async verifyMagicLink(@Body() dto: VerifyMagicLinkDto, @Ip() ip: string) {
+    const user = await this.authService.verifyMagicLink(dto.token);
+    return this.authService.login(user, ip);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('me')
+  async getCurrentUser(@CurrentUser() user: CurrentUserPayload) {
+    return this.authService.getCurrentUser(user.sub);
   }
 }

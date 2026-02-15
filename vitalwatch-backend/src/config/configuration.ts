@@ -1,9 +1,9 @@
 export default () => ({
   // Application
   app: {
-    port: parseInt(process.env.PORT, 10) || 3001,
+    port: parseInt(process.env.PORT || '3001', 10),
     env: process.env.NODE_ENV || 'development',
-    name: 'VitalWatch AI',
+    name: 'VytalWatch AI',
     version: '1.0.0',
   },
 
@@ -11,7 +11,7 @@ export default () => ({
   database: {
     type: 'postgres',
     host: process.env.DB_HOST || 'localhost',
-    port: parseInt(process.env.DB_PORT, 10) || 5432,
+    port: parseInt(process.env.DB_PORT || '5432', 10),
     username: process.env.DB_USERNAME || 'postgres',
     password: process.env.DB_PASSWORD || 'password',
     database: process.env.DB_DATABASE || 'vitalwatch',
@@ -22,7 +22,7 @@ export default () => ({
   // Redis
   redis: {
     host: process.env.REDIS_HOST || 'localhost',
-    port: parseInt(process.env.REDIS_PORT, 10) || 6379,
+    port: parseInt(process.env.REDIS_PORT || '6379', 10),
     password: process.env.REDIS_PASSWORD || undefined,
   },
 
@@ -66,17 +66,26 @@ export default () => ({
     },
   },
 
-  // Twilio
+  // Twilio (SMS/Voice)
   twilio: {
     accountSid: process.env.TWILIO_ACCOUNT_SID,
     authToken: process.env.TWILIO_AUTH_TOKEN,
     phoneNumber: process.env.TWILIO_PHONE_NUMBER,
   },
 
+  // WebRTC TURN Server (self-hosted coturn)
+  turn: {
+    url: process.env.TURN_SERVER_URL || 'turn:localhost:3478',
+    username: process.env.TURN_USERNAME || 'vitalwatch',
+    credential: process.env.TURN_PASSWORD || 'VitalWatch2024!',
+    realm: process.env.TURN_REALM || 'vitalwatch.local',
+    ttl: parseInt(process.env.TURN_TTL || '3600', 10),
+  },
+
   // Zoho SMTP
   smtp: {
     host: process.env.SMTP_HOST || 'smtp.zoho.com',
-    port: parseInt(process.env.SMTP_PORT, 10) || 587,
+    port: parseInt(process.env.SMTP_PORT || '587', 10),
     secure: process.env.SMTP_SECURE === 'true',
     user: process.env.SMTP_USER,
     password: process.env.SMTP_PASSWORD,
@@ -87,7 +96,7 @@ export default () => ({
   openai: {
     apiKey: process.env.OPENAI_API_KEY,
     model: process.env.OPENAI_MODEL || 'gpt-4',
-    maxTokens: parseInt(process.env.OPENAI_MAX_TOKENS, 10) || 2000,
+    maxTokens: parseInt(process.env.OPENAI_MAX_TOKENS || '2000', 10),
   },
 
   // Grok AI
@@ -96,11 +105,13 @@ export default () => ({
     baseUrl: process.env.GROK_BASE_URL || 'https://api.x.ai/v1',
   },
 
-  // Tenovi
+  // Tenovi HWI API
   tenovi: {
     apiKey: process.env.TENOVI_API_KEY,
+    apiUrl: process.env.TENOVI_API_URL || 'https://api2.tenovi.com',
+    clientDomain: process.env.TENOVI_CLIENT_DOMAIN,
     webhookSecret: process.env.TENOVI_WEBHOOK_SECRET,
-    baseUrl: process.env.TENOVI_BASE_URL || 'https://api.tenovi.com/v1',
+    webhookAuthKey: process.env.TENOVI_WEBHOOK_AUTH_KEY,
   },
 
   // Alert Thresholds
@@ -130,9 +141,36 @@ export default () => ({
     clinicalReviewAdditional: { code: '99458', amount: 41, minMinutes: 40 },
   },
 
-  // Audit settings
+  // Audit settings (HIPAA compliant)
   audit: {
-    retentionDays: 365, // HIPAA requires 6 years, but configurable
-    sensitiveFields: ['ssn', 'dob', 'password', 'token'],
+    retentionDays: 2190, // HIPAA requires 6 years minimum
+    sensitiveFields: ['ssn', 'dob', 'password', 'token', 'insurancePolicyNumber'],
+  },
+
+  // Session security
+  session: {
+    timeoutMinutes: parseInt(process.env.SESSION_TIMEOUT_MINUTES || '15', 10),
+    maxConcurrentSessions: parseInt(process.env.MAX_CONCURRENT_SESSIONS || '3', 10),
+    extendOnActivity: true,
+  },
+
+  // Password policy (HIPAA compliant)
+  passwordPolicy: {
+    minLength: 12,
+    requireUppercase: true,
+    requireLowercase: true,
+    requireNumbers: true,
+    requireSpecialChars: true,
+    maxAge: 90, // days
+    historyCount: 12, // prevent reuse of last 12 passwords
+    lockoutAttempts: 5,
+    lockoutDurationMinutes: 30,
+  },
+
+  // Emergency access (break-glass)
+  emergencyAccess: {
+    enabled: true,
+    notifyEmails: process.env.EMERGENCY_ACCESS_NOTIFY_EMAILS?.split(',') || [],
+    auditRetentionDays: 2190, // 6 years for emergency access logs
   },
 });

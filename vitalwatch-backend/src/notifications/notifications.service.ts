@@ -129,16 +129,51 @@ export class NotificationsService {
 
     const success = await this.sendEmail({
       to: user.email,
-      subject: 'Verify Your VitalWatch AI Account',
+      subject: 'Verify Your VytalWatch AI Account',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #0066cc;">Welcome to VitalWatch AI!</h2>
+          <h2 style="color: #0066cc;">Welcome to VytalWatch AI!</h2>
           <p>Hi ${user.firstName},</p>
           <p>Please verify your email address by clicking the button below:</p>
           <a href="${verificationUrl}" style="display: inline-block; background-color: #0066cc; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; margin: 16px 0;">Verify Email</a>
           <p>Or copy and paste this link: ${verificationUrl}</p>
           <p>This link expires in 24 hours.</p>
-          <p>Best regards,<br>The VitalWatch AI Team</p>
+          <p>Best regards,<br>The VytalWatch AI Team</p>
+        </div>
+      `,
+    });
+
+    await this.updateNotificationStatus(
+      notification.id,
+      success ? NotificationStatus.SENT : NotificationStatus.FAILED,
+    );
+  }
+
+  async sendMagicLinkEmail(user: User, magicToken: string): Promise<void> {
+    const magicLinkUrl = `${this.configService.get('app.frontendUrl')}/auth/magic-link?token=${magicToken}`;
+
+    const notification = await this.createNotification({
+      userId: user.id,
+      type: NotificationType.EMAIL,
+      category: NotificationCategory.SECURITY,
+      title: 'Sign In Link',
+      body: `Click the link to sign in to your account.`,
+      recipient: user.email,
+      data: { magicLinkUrl },
+    });
+
+    const success = await this.sendEmail({
+      to: user.email,
+      subject: 'Sign In to VytalWatch AI',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #0066cc;">Sign In to VytalWatch AI</h2>
+          <p>Hi ${user.firstName},</p>
+          <p>Click the button below to sign in to your account:</p>
+          <a href="${magicLinkUrl}" style="display: inline-block; background-color: #0066cc; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; margin: 16px 0;">Sign In</a>
+          <p>Or copy and paste this link: ${magicLinkUrl}</p>
+          <p>This link expires in 15 minutes. If you didn't request this, please ignore this email.</p>
+          <p>Best regards,<br>The VytalWatch AI Team</p>
         </div>
       `,
     });
@@ -164,7 +199,7 @@ export class NotificationsService {
 
     const success = await this.sendEmail({
       to: user.email,
-      subject: 'Reset Your VitalWatch AI Password',
+      subject: 'Reset Your VytalWatch AI Password',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2 style="color: #0066cc;">Password Reset Request</h2>
@@ -173,7 +208,7 @@ export class NotificationsService {
           <a href="${resetUrl}" style="display: inline-block; background-color: #0066cc; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; margin: 16px 0;">Reset Password</a>
           <p>Or copy and paste this link: ${resetUrl}</p>
           <p>This link expires in 1 hour. If you didn't request this, please ignore this email.</p>
-          <p>Best regards,<br>The VitalWatch AI Team</p>
+          <p>Best regards,<br>The VytalWatch AI Team</p>
         </div>
       `,
     });
@@ -229,14 +264,14 @@ export class NotificationsService {
         type: NotificationType.SMS,
         category: NotificationCategory.ALERT,
         title: `Alert: ${alert.type}`,
-        body: `VitalWatch Alert [${alert.severity.toUpperCase()}]: ${alert.message}`,
+        body: `VytalWatch Alert [${alert.severity.toUpperCase()}]: ${alert.message}`,
         recipient: user.phone,
         data: { alertId: alert.id },
       });
 
       const smsResult = await this.sendSms({
         to: user.phone,
-        body: `VitalWatch Alert [${alert.severity.toUpperCase()}]: ${alert.message}. View: ${this.configService.get('app.frontendUrl')}/alerts/${alert.id}`,
+        body: `VytalWatch Alert [${alert.severity.toUpperCase()}]: ${alert.message}. View: ${this.configService.get('app.frontendUrl')}/alerts/${alert.id}`,
       });
 
       await this.updateNotificationStatus(
@@ -316,5 +351,24 @@ export class NotificationsService {
         status: NotificationStatus.PENDING,
       },
     });
+  }
+
+  async sendSmsVerificationCode(phone: string, code: string): Promise<void> {
+    await this.sendSms({
+      to: phone,
+      body: `Your VytalWatch AI verification code is: ${code}. This code expires in 10 minutes.`,
+    });
+  }
+
+  async create(data: {
+    userId: string;
+    type: NotificationType;
+    category: NotificationCategory;
+    title: string;
+    body: string;
+    recipient?: string;
+    data?: Record<string, any>;
+  }): Promise<Notification> {
+    return this.createNotification(data);
   }
 }

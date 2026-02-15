@@ -335,4 +335,49 @@ export class DevicesService {
       byType: byType as Record<DeviceType, number>,
     };
   }
+
+  async assignToPatient(deviceId: string, patientId: string, userId: string): Promise<Device> {
+    const device = await this.findById(deviceId);
+    if (!device) {
+      throw new NotFoundException('Device not found');
+    }
+
+    device.patientId = patientId;
+    device.status = DeviceStatus.ACTIVE;
+
+    const saved = await this.deviceRepository.save(device);
+
+    await this.auditService.log({
+      action: 'DEVICE_ASSIGNED',
+      userId,
+      resourceType: 'device',
+      resourceId: deviceId,
+      details: { patientId },
+    });
+
+    return saved;
+  }
+
+  async unassignFromPatient(deviceId: string, userId: string): Promise<Device> {
+    const device = await this.findById(deviceId);
+    if (!device) {
+      throw new NotFoundException('Device not found');
+    }
+
+    const previousPatientId = device.patientId;
+    device.patientId = null as any;
+    device.status = DeviceStatus.INACTIVE;
+
+    const saved = await this.deviceRepository.save(device);
+
+    await this.auditService.log({
+      action: 'DEVICE_UNASSIGNED',
+      userId,
+      resourceType: 'device',
+      resourceId: deviceId,
+      details: { previousPatientId },
+    });
+
+    return saved;
+  }
 }

@@ -1,8 +1,11 @@
 "use client";
 
+import { useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { useToast } from "@/hooks/useToast";
 import {
   Users,
   Building,
@@ -94,6 +97,40 @@ const aiMetrics = {
 };
 
 export default function AdminDashboard() {
+  const router = useRouter();
+  const { toast } = useToast();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      toast({ title: 'Dashboard refreshed', description: 'Latest data loaded', type: 'success' });
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [toast]);
+
+  const handleSystemSettings = useCallback(() => {
+    router.push('/admin/settings');
+  }, [router]);
+
+  const handleConfigureIntegrations = useCallback(() => {
+    router.push('/admin/integrations');
+  }, [router]);
+
+  const handleViewAllLogs = useCallback(() => {
+    router.push('/admin/api-logs');
+  }, [router]);
+
+  const handleManageAI = useCallback(() => {
+    router.push('/admin/ai');
+  }, [router]);
+
+  const handleQuickAction = useCallback((href: string) => {
+    router.push(href);
+  }, [router]);
+
   return (
     <DashboardLayout requiredRole={["admin", "superadmin"]}>
       <div className="space-y-6">
@@ -108,10 +145,10 @@ export default function AdminDashboard() {
             </p>
           </div>
           <div className="flex gap-3">
-            <Button variant="outline" leftIcon={<RefreshCw className="h-4 w-4" />}>
-              Refresh
+            <Button variant="outline" leftIcon={<RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />} onClick={handleRefresh} disabled={isRefreshing}>
+              {isRefreshing ? 'Refreshing...' : 'Refresh'}
             </Button>
-            <Button leftIcon={<Settings className="h-4 w-4" />}>
+            <Button leftIcon={<Settings className="h-4 w-4" />} onClick={handleSystemSettings}>
               System Settings
             </Button>
           </div>
@@ -203,7 +240,7 @@ export default function AdminDashboard() {
                   <Zap className="h-5 w-5 text-amber-500" />
                   Integration Status
                 </CardTitle>
-                <Button variant="ghost" size="sm">
+                <Button variant="ghost" size="sm" onClick={handleConfigureIntegrations}>
                   Configure
                 </Button>
               </div>
@@ -276,7 +313,7 @@ export default function AdminDashboard() {
                   {formatRelativeTime(aiMetrics.lastTraining)}
                 </span>
               </div>
-              <Button className="w-full" variant="outline">
+              <Button className="w-full" variant="outline" onClick={handleManageAI}>
                 <Brain className="h-4 w-4 mr-2" />
                 Manage AI Models
               </Button>
@@ -292,7 +329,7 @@ export default function AdminDashboard() {
                     <Database className="h-5 w-5 text-blue-500" />
                     Recent API Requests
                   </CardTitle>
-                  <Button variant="ghost" size="sm">
+                  <Button variant="ghost" size="sm" onClick={handleViewAllLogs}>
                     View All Logs
                     <ArrowRight className="h-4 w-4 ml-1" />
                   </Button>
@@ -377,6 +414,7 @@ export default function AdminDashboard() {
               key={index}
               className="p-4 cursor-pointer hover:shadow-md transition-shadow"
               hover
+              onClick={() => handleQuickAction(action.href)}
             >
               <div
                 className={`w-10 h-10 rounded-lg bg-${action.color}-100 dark:bg-${action.color}-900/30 flex items-center justify-center mb-3`}

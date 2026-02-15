@@ -126,7 +126,7 @@ export function FeaturesSection() {
             Your 24/7 Clinical Intelligence Partner
           </h2>
           <p className="text-lg text-slate-600 dark:text-slate-400 max-w-2xl mx-auto">
-            VitalWatch AI monitors your patients around the clock, predicting problems before they escalate.
+            VytalWatch AI monitors your patients around the clock, predicting problems before they escalate.
           </p>
         </div>
 

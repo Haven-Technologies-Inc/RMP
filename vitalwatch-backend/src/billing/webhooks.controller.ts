@@ -23,9 +23,7 @@ export class WebhooksController {
   ) {
     const secretKey = this.configService.get('stripe.secretKey');
     if (secretKey) {
-      this.stripe = new Stripe(secretKey, {
-        apiVersion: '2023-10-16',
-      });
+      this.stripe = new Stripe(secretKey);
     }
   }
 
@@ -53,7 +51,7 @@ export class WebhooksController {
       throw new BadRequestException(`Webhook signature verification failed: ${err.message}`);
     }
 
-    await this.billingService.handleStripeWebhook(event);
+    await this.billingService.handleStripeWebhook(req.rawBody as Buffer, signature);
 
     return { received: true };
   }

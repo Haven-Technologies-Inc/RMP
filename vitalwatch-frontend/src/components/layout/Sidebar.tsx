@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
@@ -30,6 +31,7 @@ import {
   Key,
   FileText,
   Bell,
+  Wifi,
 } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
 
@@ -44,6 +46,7 @@ const menuConfig: Record<UserRole, MenuItem[]> = {
   patient: [
     { name: "Dashboard", href: "/patient/dashboard", icon: LayoutDashboard },
     { name: "My Vitals", href: "/patient/vitals", icon: HeartPulse },
+    { name: "My Devices", href: "/patient/devices", icon: Smartphone },
     { name: "Medications", href: "/patient/medications", icon: Pill },
     { name: "Appointments", href: "/patient/appointments", icon: Calendar },
     { name: "Messages", href: "/patient/messages", icon: MessageSquare, badge: 3 },
@@ -54,6 +57,7 @@ const menuConfig: Record<UserRole, MenuItem[]> = {
     { name: "Dashboard", href: "/provider/dashboard", icon: LayoutDashboard },
     { name: "Alerts", href: "/provider/alerts", icon: AlertTriangle, badge: 12 },
     { name: "Patients", href: "/provider/patients", icon: Users },
+    { name: "Devices", href: "/provider/devices", icon: Smartphone },
     { name: "Analytics", href: "/provider/analytics", icon: BarChart3 },
     { name: "Messages", href: "/provider/messages", icon: MessageSquare, badge: 5 },
     { name: "Billing", href: "/provider/billing", icon: CreditCard },
@@ -65,6 +69,7 @@ const menuConfig: Record<UserRole, MenuItem[]> = {
     { name: "Users", href: "/admin/users", icon: Users },
     { name: "Organizations", href: "/admin/organizations", icon: Building },
     { name: "Devices", href: "/admin/devices", icon: Smartphone },
+    { name: "Gateways", href: "/admin/gateways", icon: Wifi },
     { name: "Billing", href: "/admin/billing", icon: CreditCard },
     { name: "Integrations", href: "/admin/integrations", icon: Zap },
     { name: "AI Management", href: "/admin/ai", icon: Activity },
@@ -77,6 +82,7 @@ const menuConfig: Record<UserRole, MenuItem[]> = {
     { name: "Users", href: "/admin/users", icon: Users },
     { name: "Organizations", href: "/admin/organizations", icon: Building },
     { name: "Devices", href: "/admin/devices", icon: Smartphone },
+    { name: "Gateways", href: "/admin/gateways", icon: Wifi },
     { name: "Billing", href: "/admin/billing", icon: CreditCard },
     { name: "Integrations", href: "/admin/integrations", icon: Zap },
     { name: "AI Management", href: "/admin/ai", icon: Activity },
@@ -107,15 +113,16 @@ export function Sidebar({ role }: SidebarProps) {
     >
       {/* Logo */}
       <div className="h-16 flex items-center justify-between px-4 border-b border-slate-200 dark:border-slate-700">
-        <Link href="/" className="flex items-center gap-2">
-          <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-emerald-500 rounded-xl flex items-center justify-center flex-shrink-0">
-            <Activity className="h-6 w-6 text-white" />
-          </div>
-          {!collapsed && (
-            <span className="text-lg font-bold text-slate-900 dark:text-white">
-              VitalWatch
-            </span>
-          )}
+        <Link href="/" className="flex items-center">
+          <Image
+            src="/logo.png"
+            alt="VytalWatch"
+            width={collapsed ? 40 : 120}
+            height={40}
+            className="h-10"
+            style={{ width: 'auto', height: 'auto', maxHeight: '2.5rem' }}
+            priority
+          />
         </Link>
         <button
           onClick={() => setCollapsed(!collapsed)}

@@ -150,9 +150,72 @@ export class UsersService {
 
   async clearResetToken(id: string): Promise<void> {
     await this.userRepository.update(id, {
-      resetToken: null,
-      resetTokenExpiresAt: null,
+      resetToken: undefined,
+      resetTokenExpiresAt: undefined,
+    } as any);
+  }
+
+  async setMagicLinkToken(id: string, token: string): Promise<void> {
+    const expiresAt = new Date();
+    expiresAt.setMinutes(expiresAt.getMinutes() + 15); // Token expires in 15 minutes
+
+    await this.userRepository.update(id, {
+      magicLinkToken: token,
+      magicLinkTokenExpiresAt: expiresAt,
+    } as any);
+  }
+
+  async findByMagicLinkToken(token: string): Promise<User | null> {
+    const user = await this.userRepository.findOne({
+      where: { magicLinkToken: token } as any,
     });
+
+    if (!user || !(user as any).magicLinkTokenExpiresAt || (user as any).magicLinkTokenExpiresAt < new Date()) {
+      return null;
+    }
+
+    return user;
+  }
+
+  async clearMagicLinkToken(id: string): Promise<void> {
+    await this.userRepository.update(id, {
+      magicLinkToken: undefined,
+      magicLinkTokenExpiresAt: undefined,
+    } as any);
+  }
+
+  async setSmsVerificationCode(phone: string, code: string): Promise<void> {
+    const user = await this.userRepository.findOne({ where: { phone } });
+    if (user) {
+      const expiresAt = new Date();
+      expiresAt.setMinutes(expiresAt.getMinutes() + 10);
+      await this.userRepository.update(user.id, {
+        smsVerificationCode: code,
+        smsVerificationExpiresAt: expiresAt,
+      } as any);
+    }
+  }
+
+  async verifySmsCode(phone: string, code: string): Promise<boolean> {
+    const user = await this.userRepository.findOne({ where: { phone } });
+    if (!user) return false;
+    
+    const userData = user as any;
+    if (!userData.smsVerificationCode || !userData.smsVerificationExpiresAt) return false;
+    if (userData.smsVerificationExpiresAt < new Date()) return false;
+    
+    return userData.smsVerificationCode === code;
+  }
+
+  async markPhoneVerified(phone: string): Promise<void> {
+    const user = await this.userRepository.findOne({ where: { phone } });
+    if (user) {
+      await this.userRepository.update(user.id, {
+        phoneVerified: true,
+        smsVerificationCode: undefined,
+        smsVerificationExpiresAt: undefined,
+      } as any);
+    }
   }
 
   async findByVerificationToken(token: string): Promise<User | null> {
@@ -164,9 +227,9 @@ export class UsersService {
   async verifyEmail(id: string): Promise<void> {
     await this.userRepository.update(id, {
       emailVerified: true,
-      verificationToken: null,
+      verificationToken: undefined,
       status: UserStatus.ACTIVE,
-    });
+    } as any);
   }
 
   async findAll(options?: {

@@ -9,7 +9,10 @@ import {
 
 export enum AlertSeverity {
   INFO = 'info',
+  LOW = 'low',
+  MEDIUM = 'medium',
   WARNING = 'warning',
+  HIGH = 'high',
   CRITICAL = 'critical',
 }
 
@@ -23,6 +26,7 @@ export enum AlertStatus {
 export enum AlertType {
   VITAL_THRESHOLD = 'vital_threshold',
   VITAL_TREND = 'vital_trend',
+  VITAL_ABNORMAL = 'vital_abnormal',
   DEVICE_OFFLINE = 'device_offline',
   MEDICATION_MISSED = 'medication_missed',
   NO_READING = 'no_reading',
@@ -137,6 +141,15 @@ export class Alert {
 
   @Column({ nullable: true })
   nextEscalationAt: Date;
+
+  @Column({ nullable: true })
+  escalatedAt: Date;
+
+  @Column({ default: false })
+  notificationSent: boolean;
+
+  @Column('jsonb', { nullable: true })
+  metadata: Record<string, any>;
 
   @CreateDateColumn()
   createdAt: Date;

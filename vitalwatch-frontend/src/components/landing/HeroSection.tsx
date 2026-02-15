@@ -92,7 +92,7 @@ export function HeroSection() {
                         <Activity className="h-5 w-5 text-white" />
                       </div>
                       <div>
-                        <div className="text-sm font-semibold text-slate-900 dark:text-white">VitalWatch AI</div>
+                        <div className="text-sm font-semibold text-slate-900 dark:text-white">VytalWatch AI</div>
                         <div className="text-xs text-slate-500">Provider Dashboard</div>
                       </div>
                     </div>

@@ -10,33 +10,50 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Brand Colors
+        // VytalWatch Brand Colors
+        // Primary Colors
         primary: {
-          50: "#EFF6FF",
-          100: "#DBEAFE",
-          200: "#BFDBFE",
-          300: "#93C5FD",
-          400: "#60A5FA",
-          500: "#3B82F6",
-          600: "#2563EB",
-          700: "#1D4ED8",
-          800: "#1E40AF",
-          900: "#1E3A8A",
-          DEFAULT: "#0066FF",
+          50: "#E8F4F8",
+          100: "#C5E4ED",
+          200: "#9FD3E2",
+          300: "#79C2D7",
+          400: "#4EABC7",
+          500: "#1B9AAA", // Teal Blue - Digital health, innovation
+          600: "#0A3D62", // Medical Blue - Trust, stability
+          700: "#083352",
+          800: "#062942",
+          900: "#041E32",
+          DEFAULT: "#0A3D62", // Medical Blue as default
         },
+        // Secondary Colors
         secondary: {
-          50: "#ECFDF5",
-          100: "#D1FAE5",
-          200: "#A7F3D0",
-          300: "#6EE7B7",
-          400: "#34D399",
-          500: "#10B981",
-          600: "#059669",
-          700: "#047857",
-          800: "#065F46",
-          900: "#064E3B",
-          DEFAULT: "#00C48C",
+          50: "#E8FCF1",
+          100: "#C6F7DB",
+          200: "#A8E6CF", // Soft Aqua - Compassion
+          300: "#7DDCB5",
+          400: "#52D49B",
+          500: "#2ECC71", // Vital Green - Health, recovery
+          600: "#27AE60",
+          700: "#1E8449",
+          800: "#186A3B",
+          900: "#145A32",
+          DEFAULT: "#2ECC71", // Vital Green as default
         },
+        // Teal accent
+        teal: {
+          50: "#E6F7F8",
+          100: "#B3E8EC",
+          200: "#80D9E0",
+          300: "#4DCAD4",
+          400: "#26BDC9",
+          500: "#1B9AAA", // Teal Blue
+          600: "#177E8B",
+          700: "#13626C",
+          800: "#0F464D",
+          900: "#0B2A2E",
+          DEFAULT: "#1B9AAA",
+        },
+        // Accent (alerts)
         accent: {
           50: "#FEF2F2",
           100: "#FEE2E2",
@@ -48,8 +65,9 @@ const config: Config = {
           700: "#B91C1C",
           800: "#991B1B",
           900: "#7F1D1D",
-          DEFAULT: "#FF6B6B",
+          DEFAULT: "#EF4444",
         },
+        // Warning (amber)
         warning: {
           50: "#FFFBEB",
           100: "#FEF3C7",
@@ -61,16 +79,30 @@ const config: Config = {
           700: "#B45309",
           800: "#92400E",
           900: "#78350F",
-          DEFAULT: "#FFA726",
+          DEFAULT: "#F59E0B",
+        },
+        // Neutral Colors
+        slate: {
+          50: "#F5F7FA", // Light Gray
+          100: "#E4E7EB",
+          200: "#CBD2D9",
+          300: "#9AA5B1",
+          400: "#7B8794",
+          500: "#616E7C",
+          600: "#52606D",
+          700: "#3E4C59",
+          800: "#2E3A3F", // Dark Slate
+          900: "#1F2933",
+          DEFAULT: "#2E3A3F",
         },
         // Surface colors for light/dark modes
         surface: {
           light: "#FFFFFF",
-          dark: "#1E293B",
+          dark: "#2E3A3F", // Dark Slate
         },
         background: {
-          light: "#F8FAFC",
-          dark: "#0F172A",
+          light: "#F5F7FA", // Light Gray
+          dark: "#1F2933",
         },
       },
       fontFamily: {

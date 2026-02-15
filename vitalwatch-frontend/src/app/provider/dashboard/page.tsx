@@ -1,5 +1,7 @@
 "use client";
 
+import { useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -8,7 +10,6 @@ import {
   AlertTriangle,
   TrendingUp,
   DollarSign,
-  Activity,
   ArrowRight,
   Phone,
   Eye,
@@ -17,8 +18,11 @@ import {
   Lightbulb,
   Target,
   RefreshCw,
+  CheckCircle,
+  MessageSquare,
 } from "lucide-react";
-import { formatCurrency, formatRelativeTime } from "@/lib/utils";
+import { formatRelativeTime } from "@/lib/utils";
+import { useToast } from "@/hooks/useToast";
 
 // Mock data
 const stats = [
@@ -172,6 +176,45 @@ const aiInsights = [
 ];
 
 export default function ProviderDashboard() {
+  const router = useRouter();
+  const { toast } = useToast();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      // Simulate API refresh
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      toast({ title: "Dashboard refreshed", description: "All data is up to date" });
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [toast]);
+
+  const handleAddPatient = () => {
+    router.push("/provider/patients?action=add");
+  };
+
+  const handleViewAllAlerts = () => {
+    router.push("/provider/alerts");
+  };
+
+  const handleViewPatient = (patientId: string) => {
+    router.push(`/provider/patients/${patientId}`);
+  };
+
+  const handleCallPatient = (patientName: string) => {
+    toast({ title: "Initiating call", description: `Calling ${patientName}...` });
+  };
+
+  const handleAcknowledgeAlert = (alertId: string) => {
+    toast({ title: "Alert acknowledged", description: `Alert ${alertId} has been acknowledged` });
+  };
+
+  const handleMessagePatient = (patientId: string, patientName: string) => {
+    router.push(`/provider/messages?patient=${patientId}&name=${encodeURIComponent(patientName)}`);
+  };
+
   return (
     <DashboardLayout requiredRole="provider">
       <div className="space-y-6">
@@ -186,10 +229,15 @@ export default function ProviderDashboard() {
             </p>
           </div>
           <div className="flex gap-3">
-            <Button variant="outline" leftIcon={<RefreshCw className="h-4 w-4" />}>
-              Refresh
+            <Button 
+              variant="outline" 
+              leftIcon={<RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />}
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+            >
+              {isRefreshing ? 'Refreshing...' : 'Refresh'}
             </Button>
-            <Button leftIcon={<Users className="h-4 w-4" />}>
+            <Button leftIcon={<Users className="h-4 w-4" />} onClick={handleAddPatient}>
               Add Patient
             </Button>
           </div>
@@ -241,7 +289,7 @@ export default function ProviderDashboard() {
                     <AlertTriangle className="h-5 w-5 text-red-500" />
                     Active Alerts
                   </CardTitle>
-                  <Button variant="ghost" size="sm">
+                  <Button variant="ghost" size="sm" onClick={handleViewAllAlerts}>
                     View All <ArrowRight className="h-4 w-4 ml-1" />
                   </Button>
                 </div>
@@ -278,11 +326,32 @@ export default function ProviderDashboard() {
                           {formatRelativeTime(alert.time)}
                         </span>
                         <div className="flex gap-1">
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8"
+                            onClick={() => handleViewPatient(alert.id)}
+                            title="View patient"
+                          >
                             <Eye className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8"
+                            onClick={() => handleCallPatient(alert.patient.name)}
+                            title="Call patient"
+                          >
                             <Phone className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8"
+                            onClick={() => handleAcknowledgeAlert(alert.id)}
+                            title="Acknowledge alert"
+                          >
+                            <CheckCircle className="h-4 w-4" />
                           </Button>
                         </div>
                       </div>
@@ -351,7 +420,11 @@ export default function ProviderDashboard() {
             <div className="flex items-center justify-between">
               <CardTitle>Patient Overview</CardTitle>
               <div className="flex gap-2">
-                <select className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                <select 
+                  aria-label="Filter patients by risk level"
+                  title="Filter patients"
+                  className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300"
+                >
                   <option>All Patients</option>
                   <option>High Risk</option>
                   <option>Medium Risk</option>
@@ -453,11 +526,29 @@ export default function ProviderDashboard() {
                     </td>
                     <td className="table-cell">
                       <div className="flex gap-1">
-                        <Button variant="ghost" size="sm">
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => handleViewPatient(patient.id)}
+                          title="View patient details"
+                        >
                           <Eye className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="sm">
-                          <MoreHorizontal className="h-4 w-4" />
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => handleMessagePatient(patient.id, patient.name)}
+                          title="Message patient"
+                        >
+                          <MessageSquare className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => handleCallPatient(patient.name)}
+                          title="Call patient"
+                        >
+                          <Phone className="h-4 w-4" />
                         </Button>
                       </div>
                     </td>
